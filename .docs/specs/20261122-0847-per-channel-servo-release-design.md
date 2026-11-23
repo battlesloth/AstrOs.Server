@@ -107,17 +107,17 @@ Decisions marked **(Jeff)** came from Jeff in the brainstorming session. Decisio
 
 ### Data model
 
-- **Migration naming comes first (Jeff: new prefix, no renames).** Kysely sorts migration names as plain text, in both 0.27.6 and the latest 0.29.9 (`#resolveMigrations` ignores `nameComparator`), so a `10_…` name would sort before `1_…`. That is the open PLAN.md Backlog item "Decide before migration 10".
+- **Migration naming comes first (Jeff: new prefix, no renames).** Kysely sorts migration names as plain text, in both 0.27.6 and the latest 0.29.9 (`#resolveMigrations` ignores `nameComparator`), so a `10_…` name would sort before `1_…`. That was the PLAN.md Backlog item "Decide before migration 10".
   - Migrations from 10 on take a prefix that sorts after `9_…` as plain text: `m010_<name>`, `m011_<name>`, and so on. Lowercase letters sort after digits and `_`.
   - Existing names and `kysely_migration` rows are untouched.
   - A prerequisite server task teaches the scheme to:
     - `compareMigrationNames` (`dal/backup.ts`), which orders pending migrations and names backups
     - the T-006 newer-database guard
     - `database.integration.test.ts` (its `ORDER BY name DESC` and the injected `9_…` test migrations)
-  - It proves on a copy of a migration-9 database, and on a fresh one, that a sample `m010_` runs last.
+  - It proves, on a database migrated to 9 and on a fresh one, that a test-range `m9NN_` sample runs last.
   - Ruled out:
     - a Kysely upgrade (it sorts the same way)
-    - `allowUnorderedMigrations`: on a fresh install the new migration would run before migration 6, which rebuilds `maestro_channels` and would drop the column
+    - `allowUnorderedMigrations`: on a fresh install the new migration would run before migration 6, which copies `maestro_channels` with `SELECT *` into a rebuilt table, so the extra column would break migration 6
     - renaming every migration (a one-time data rewrite on every install)
 - **Migration `m010_add_maestro_release_ms`:** `maestro_channels.release_ms integer not null default 5000`.
   - Existing rows get 5000.
@@ -213,7 +213,7 @@ Decisions marked **(Jeff)** came from Jeff in the brainstorming session. Decisio
   - the version cache (empty versions skipped)
   - the gate: below minimum skipped with its reason code in the reply's `skipped`, unknown version skipped, a dev build accepted, all skipped → no `DEPLOY_CONFIG`
   - save validation
-  - the migration naming task: an `m010_` sample runs last on a copy of a migration-9 database and on a fresh one; the newer-database guard and backup naming order it after `9_`
+  - the migration naming task: a test-range `m9NN_` sample runs last on a database migrated to 9 and on a fresh one; the newer-database guard and backup naming order it after `9_`
 - **Vue tests:**
   - the field shows only for servo channels, with the seconds ↔ ms conversion and the range error
   - the Sync toasts for some skipped and for all skipped

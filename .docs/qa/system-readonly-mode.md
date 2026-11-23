@@ -24,7 +24,7 @@ Four ways to put the server into read-only mode for testing. Pick whichever matc
 2. **`BACKUP_FAILED`** — drop write permissions on the dbDir before starting:
    ```bash
    chmod 0500 ~/.config/astrosserver
-   # add an unapplied migration to force a backup attempt (see git-stash a quick stub or temporarily edit migrations/index.ts)
+   # add an unapplied migration to force a backup attempt (temporarily add a stub such as `m950_test_force_backup` to `PRODUCTION_MIGRATIONS` in `dal/database.ts`, then revert it)
    npm run start
    # restore perms after: chmod 0700 ~/.config/astrosserver
    ```
@@ -128,12 +128,12 @@ The UI shows a single notice page in place of the app.
 
 ### Preconditions
 
-- Work on a **copy** of the active dev database, never the real one. That is `database.sqlite3` in the directory `DATABASE_PATH` names in `astros_api/.env` (`../.data`, i.e. `.data/database.sqlite3` at the repo root on the dev machine). It must be at this build's latest migration: the last name `SELECT name FROM kysely_migration` prints should be the last one in `dal/database.ts`'s provider. An older copy stages the branch-switch case below instead.
+- Work on a **copy** of the active dev database, never the real one. That is `database.sqlite3` in the directory `DATABASE_PATH` names in `astros_api/.env` (`../.data`, i.e. `.data/database.sqlite3` at the repo root on the dev machine). It must be at this build's latest migration: the last name `SELECT name FROM kysely_migration ORDER BY name` prints should be the last one in `PRODUCTION_MIGRATIONS` (`dal/database.ts`). Names sort as plain text: legacy `0_…`–`9_…`, then `m010_…` onward (T-012). An older copy stages the branch-switch case below instead.
   ```bash
   mkdir -p /tmp/astros-newer-db
   cp .data/database.sqlite3 /tmp/astros-newer-db/
   sqlite3 /tmp/astros-newer-db/database.sqlite3 \
-    "INSERT INTO kysely_migration (name, timestamp) VALUES ('99_future', '2026-10-22T00:00:00.000Z')"
+    "INSERT INTO kysely_migration (name, timestamp) VALUES ('m099_future', '2026-10-22T00:00:00.000Z')"
   sha256sum /tmp/astros-newer-db/database.sqlite3 > /tmp/astros-newer-db.sha256
   ls /tmp/astros-newer-db   # only database.sqlite3
   ```
@@ -148,7 +148,7 @@ The UI shows a single notice page in place of the app.
 ### 9. Startup refuses the database
 
 1. Start the API as above and watch its log.
-2. **Pass:** the log has `Entering read-only mode (DB_NEWER_THAN_SERVER): database has migrations this build does not know: 99_future`, and `Skipping serial port setup: database version is newer than this server supports` appears exactly once.
+2. **Pass:** the log has `Entering read-only mode (DB_NEWER_THAN_SERVER): database has migrations this build does not know: m099_future`, and `Skipping serial port setup: database version is newer than this server supports` appears exactly once.
 3. **Fail:** any `Created pre-migration backup`, `migration "…" was executed`, or `Starting up serial port services` line.
 
 ### 10. The notice page replaces the app
@@ -183,13 +183,13 @@ curl -s -i localhost:3000/api/system/status
 
 ### 13. Recovery
 
-1. With the notice page still open, stop the API and start it against a database without `99_future`. Use a fresh copy of the dev database, or the dev database itself: drop the `DATABASE_PATH=…` prefix so the value sourced from `.env` applies.
+1. With the notice page still open, stop the API and start it against a database without `m099_future`. Use a fresh copy of the dev database, or the dev database itself: drop the `DATABASE_PATH=…` prefix so the value sourced from `.env` applies.
 2. **Pass:** within about 3 s (the WebSocket retry interval) the notice is replaced by the login page. This happens even with a saved session: while the database was incompatible, the router turned every navigation into `/auth`. The token is kept, so you can sign in or go straight to `/`.
 3. **Fail:** the notice persists after the reconnect.
 
 ### 14. Branch switch: unknown and pending migrations
 
-`database.integration.test.ts` covers this case. To stage it by hand, repeat the preconditions with a copy of a database that is one or more migrations **behind** this build (for example, an old `~/.config/astrosserver/database.sqlite3`), plus `99_future`.
+`database.integration.test.ts` covers this case. To stage it by hand, repeat the preconditions with a copy of a database that is one or more migrations **behind** this build (for example, an old `~/.config/astrosserver/database.sqlite3`), plus `m099_future`.
 
 **Pass:** cases 9 and 12 hold exactly as above. Nothing is applied and no `.backup-*` file appears, even though this build has migrations the database lacks.
 **Fail:** any `Created pre-migration backup` or `migration "…" was executed` line, or `MIGRATION_FAILED_RESTORED` instead of `DB_NEWER_THAN_SERVER`.

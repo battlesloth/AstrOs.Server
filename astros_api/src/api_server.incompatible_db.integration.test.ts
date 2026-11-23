@@ -40,7 +40,7 @@ describe('ApiServer on a database written by a newer server', { timeout: 15_000 
     const sqlite = new SQLite(dbPath);
     sqlite
       .prepare('INSERT INTO kysely_migration (name, timestamp) VALUES (?, ?)')
-      .run('99_future', '2026-10-22T00:00:00.000Z');
+      .run('m099_future', '2026-10-22T00:00:00.000Z');
     sqlite.close();
   });
 

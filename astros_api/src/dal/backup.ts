@@ -15,19 +15,50 @@ async function migrationTableExists(db: Kysely<Database>): Promise<boolean> {
   return result.rows.length > 0;
 }
 
-// Compare migration names by their leading numeric prefix (`<n>_<slug>`),
-// falling back to lexicographic order on the slug or for non-conforming names.
-// Plain .sort() would put '10_foo' before '2_foo' because '1' < '2'.
+const LEGACY_NAME = /^(\d+)_(.*)$/;
+const M_SCHEME_NAME = /^m(\d{3})_(.*)$/;
+
+// Naming schemes in run order; compareMigrationNames subtracts them.
+type MigrationRank = { scheme: 0 /* legacy <n>_ */ | 1 /* m<NNN>_ */; num: number; slug: string };
+
+function migrationRank(name: string): MigrationRank | null {
+  const legacy = LEGACY_NAME.exec(name);
+  if (legacy) return { scheme: 0, num: parseInt(legacy[1], 10), slug: legacy[2] };
+  const mScheme = M_SCHEME_NAME.exec(name);
+  if (mScheme) return { scheme: 1, num: parseInt(mScheme[1], 10), slug: mScheme[2] };
+  return null;
+}
+
+function compareCodeUnits(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
+// The canonical migration order. Kysely's resolver runs migrations in plain
+// .sort() order (Migrator#resolveMigrations ignores nameComparator), so for every
+// name the registry may hold this must agree with plain .sort():
+//   - legacy `<n>_<slug>` (0_initial … 9_add_script_event_end_time), by number;
+//   - from 10 on, `m<NNN>_<slug>` (m010_…), after every legacy name, by number
+//     (a plain `10_` would sort before `1_`, see T-012);
+//   - a tie on the number compares the slug, then the whole name, by UTF-16 code
+//     unit, as .sort() does. (Kysely orders *executed* migrations by timestamp
+//     and breaks same-millisecond ties, common on a fresh install, with
+//     localeCompare on the whole name. That agrees with .sort() for every valid
+//     name only while numbers are unique, which database.test.ts pins for the
+//     production registry.)
+// Multi-digit legacy names only arrive from an old sibling branch's database and
+// keep numeric order. Names matching neither pattern sort last, by localeCompare.
 // Exported so tests can derive expected ordering without duplicating the rule.
 export function compareMigrationNames(a: string, b: string): number {
-  const matchA = a.match(/^(\d+)_(.*)$/);
-  const matchB = b.match(/^(\d+)_(.*)$/);
-  if (matchA && matchB) {
-    const numA = parseInt(matchA[1], 10);
-    const numB = parseInt(matchB[1], 10);
-    if (numA !== numB) return numA - numB;
-    return matchA[2].localeCompare(matchB[2]);
+  const rankA = migrationRank(a);
+  const rankB = migrationRank(b);
+  if (rankA && rankB) {
+    if (rankA.scheme !== rankB.scheme) return rankA.scheme - rankB.scheme;
+    if (rankA.num !== rankB.num) return rankA.num - rankB.num;
+    return compareCodeUnits(rankA.slug, rankB.slug) || compareCodeUnits(a, b);
   }
+  if (rankA) return -1;
+  if (rankB) return 1;
   return a.localeCompare(b);
 }
 
