@@ -57,6 +57,7 @@ describe('SystemStatus', () => {
     'MIGRATION_FAILED_NO_BACKUP',
     'MIGRATION_FAILED_RESTORED',
     'MIGRATION_FAILED_RESTORE_FAILED',
+    'MIGRATION_INTERRUPTED',
   ] as const)('isDbIncompatible is false for %s', (code) => {
     const status = new SystemStatus();
     status.enterReadOnly(code);

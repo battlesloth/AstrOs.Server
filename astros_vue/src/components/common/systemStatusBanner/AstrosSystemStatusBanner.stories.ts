@@ -54,6 +54,7 @@ export const BackupFailed = makeStory('BACKUP_FAILED');
 export const MigrationFailedNoBackup = makeStory('MIGRATION_FAILED_NO_BACKUP');
 export const MigrationFailedRestored = makeStory('MIGRATION_FAILED_RESTORED');
 export const MigrationFailedRestoreFailed = makeStory('MIGRATION_FAILED_RESTORE_FAILED');
+export const MigrationInterrupted = makeStory('MIGRATION_INTERRUPTED');
 // App.vue shows the incompatible-database notice instead of any page with this
 // banner; the story shows the localized copy should the banner ever see the
 // code (the banner spec pins it).

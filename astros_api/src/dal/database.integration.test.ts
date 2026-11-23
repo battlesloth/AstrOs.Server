@@ -7,6 +7,8 @@ import SQLite from 'better-sqlite3';
 import { Kysely, Migration, MigrationProvider, sql } from 'kysely';
 import { SystemStatus } from '../system_status.js';
 import { Database } from './types.js';
+import { migrationSentinelPath, writeMigrationSentinel } from './backup.js';
+import { logger as dbLogger } from 'src/logger.js';
 import {
   initializeDatabase,
   closeDatabaseForTest,
@@ -591,5 +593,396 @@ describe('the m<NNN>_ migration naming scheme', { timeout: 15_000 }, () => {
 
     expect(status.getState()).toEqual({ readOnly: false });
     expect((await runOrder(db)).at(-1)).toBe('m911_test_next');
+  });
+});
+
+// T-016: a migration-in-progress sentinel keeps the pre-migration backup safe
+// across an interrupted run (a power cut mid-migration, or a failed restore).
+describe('an interrupted migration', { timeout: 20_000 }, () => {
+  let tmpDir: string;
+  let dbPath: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'astros-db-interrupted-'));
+    dbPath = path.join(tmpDir, 'database.sqlite3');
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await closeDatabaseForTest();
+    __resetMigrationProviderForTest();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  const backupPath = () => `${dbPath}.backup-${PRODUCTION_LATEST}`;
+  const sentinel = () => migrationSentinelPath(dbPath);
+
+  function tables(file: string): string[] {
+    const db = new SQLite(file, { readonly: true });
+    try {
+      return db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .all()
+        .map((r) => (r as { name: string }).name);
+    } finally {
+      db.close();
+    }
+  }
+
+  // Creates a table, then throws while `failing.value` is true: a migration
+  // that leaves partial writes behind, as a power cut mid-run does.
+  function partialMigration(failing: { value: boolean }): Record<string, Migration> {
+    return {
+      m950_test_partial: {
+        async up(db) {
+          await db.schema.createTable('partial').addColumn('id', 'integer').execute();
+          if (failing.value) {
+            throw new Error('intentional mid-migration failure');
+          }
+        },
+        async down() {
+          return;
+        },
+      },
+    };
+  }
+
+  async function migrateToProductionLatest(): Promise<void> {
+    await initializeDatabase(new SystemStatus(), { dbPath });
+    await closeDatabaseForTest();
+  }
+
+  it("keeps the good backup when a boot finds the last run interrupted (the reviewer's reproduction)", async () => {
+    // Break: the next boot's createBackup overwriting the only pre-migration
+    // copy with the half-migrated database.
+    await migrateToProductionLatest();
+    const failing = { value: true };
+    __setMigrationProviderForTest(buildProvider(partialMigration(failing)));
+
+    // Boot 1: the migration leaves a partial table and the restore fails.
+    const spy = vi.spyOn(fs, 'copyFileSync').mockImplementation(() => {
+      throw new Error('intentional restore failure');
+    });
+    let status = new SystemStatus();
+    try {
+      await initializeDatabase(status, { dbPath });
+    } finally {
+      spy.mockRestore();
+    }
+    await closeDatabaseForTest();
+    expect(status.getState().reasonCode).toBe('MIGRATION_FAILED_RESTORE_FAILED');
+    expect(fs.existsSync(sentinel())).toBe(true);
+    expect(tables(dbPath)).toContain('partial');
+    expect(tables(backupPath())).not.toContain('partial');
+
+    // Boot 2: the cause is gone; the good backup must be restored first.
+    failing.value = false;
+    status = new SystemStatus();
+    const warn = vi.spyOn(dbLogger, 'warn');
+    const db = await initializeDatabase(status, { dbPath });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(
+        new RegExp(
+          `^Restored ${backupPath().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} after an interrupted migration \\(started .+\\)$`,
+        ),
+      ),
+    );
+    expect(status.getState()).toEqual({ readOnly: false });
+    expect(fs.existsSync(sentinel())).toBe(false);
+    expect(tables(backupPath())).not.toContain('partial');
+    expect((await runOrder(db)).at(-1)).toBe('m950_test_partial');
+  });
+
+  it('leaves no sentinel after a migration run succeeds', async () => {
+    await migrateToProductionLatest();
+    __setMigrationProviderForTest(buildProvider(partialMigration({ value: false })));
+    const status = new SystemStatus();
+    await initializeDatabase(status, { dbPath });
+    expect(status.getState()).toEqual({ readOnly: false });
+    expect(fs.existsSync(sentinel())).toBe(false);
+  });
+
+  it('leaves no sentinel after a failed migration is restored', async () => {
+    await migrateToProductionLatest();
+    __setMigrationProviderForTest(buildProvider(partialMigration({ value: true })));
+    const status = new SystemStatus();
+    await initializeDatabase(status, { dbPath });
+    expect(status.getState().reasonCode).toBe('MIGRATION_FAILED_RESTORED');
+    expect(fs.existsSync(sentinel())).toBe(false);
+  });
+
+  it('enters MIGRATION_INTERRUPTED and touches nothing when the recorded backup is missing', async () => {
+    await migrateToProductionLatest();
+    writeMigrationSentinel(dbPath, {
+      backupPath: `${dbPath}.backup-gone`,
+      lastApplied: PRODUCTION_LATEST,
+    });
+    const before = { sha: sha256(dbPath), files: fs.readdirSync(tmpDir).sort() };
+
+    __setMigrationProviderForTest(buildProvider(partialMigration({ value: false })));
+    const status = new SystemStatus();
+    await initializeDatabase(status, { dbPath });
+    await closeDatabaseForTest();
+
+    expect(status.getState().reasonCode).toBe('MIGRATION_INTERRUPTED');
+    expect(sha256(dbPath)).toBe(before.sha);
+    expect(fs.readdirSync(tmpDir).sort()).toEqual(before.files);
+  });
+
+  it('enters MIGRATION_INTERRUPTED and touches nothing when the sentinel is corrupt', async () => {
+    await migrateToProductionLatest();
+    fs.writeFileSync(sentinel(), '{');
+    const before = { sha: sha256(dbPath), files: fs.readdirSync(tmpDir).sort() };
+
+    // A pending migration, so "touches nothing" means no backup or migrate ran.
+    __setMigrationProviderForTest(buildProvider(partialMigration({ value: false })));
+    const status = new SystemStatus();
+    await initializeDatabase(status, { dbPath });
+    await closeDatabaseForTest();
+
+    expect(status.getState().reasonCode).toBe('MIGRATION_INTERRUPTED');
+    expect(sha256(dbPath)).toBe(before.sha);
+    expect(fs.readdirSync(tmpDir).sort()).toEqual(before.files);
+  });
+
+  it('restores and re-migrates when a sentinel outlived a successful run', async () => {
+    // A crash after the migration succeeded but before the sentinel was removed.
+    // Break: deleting the sentinel without restoring, so the migration never
+    // re-runs (the up() count stays at 1).
+    await migrateToProductionLatest();
+    let ups = 0;
+    const provider = buildProvider({
+      m950_test_partial: {
+        async up(db) {
+          ups++;
+          await db.schema.createTable('partial').addColumn('id', 'integer').execute();
+        },
+        async down() {
+          return;
+        },
+      },
+    });
+    __setMigrationProviderForTest(provider);
+    await initializeDatabase(new SystemStatus(), { dbPath });
+    await closeDatabaseForTest();
+    writeMigrationSentinel(dbPath, { backupPath: backupPath(), lastApplied: PRODUCTION_LATEST });
+
+    const status = new SystemStatus();
+    const db = await initializeDatabase(status, { dbPath });
+    expect(status.getState()).toEqual({ readOnly: false });
+    expect(fs.existsSync(sentinel())).toBe(false);
+    expect((await runOrder(db)).at(-1)).toBe('m950_test_partial');
+    expect(tables(dbPath).filter((t) => t === 'partial')).toHaveLength(1);
+    expect(ups).toBe(2);
+  });
+
+  it('does not migrate when the sentinel cannot be written', async () => {
+    // Break: migrating without a sentinel, so an interruption would cost the backup.
+    await migrateToProductionLatest();
+    fs.mkdirSync(`${sentinel()}.tmp`); // writing the temp file fails (EISDIR)
+    let ran = false;
+    __setMigrationProviderForTest(
+      buildProvider({
+        m950_test_partial: {
+          async up() {
+            ran = true;
+          },
+          async down() {
+            return;
+          },
+        },
+      }),
+    );
+    const status = new SystemStatus();
+    await initializeDatabase(status, { dbPath });
+    expect(status.getState().reasonCode).toBe('BACKUP_FAILED');
+    expect(ran).toBe(false);
+  });
+
+  // Stage a sentinel naming `backup` (written by `write`), with a pending migration.
+  async function stageSentinel(
+    write: (backup: string) => void,
+  ): Promise<{ sha: string; files: string[] }> {
+    await migrateToProductionLatest();
+    write(backupPath());
+    writeMigrationSentinel(dbPath, { backupPath: backupPath(), lastApplied: PRODUCTION_LATEST });
+    __setMigrationProviderForTest(buildProvider(partialMigration({ value: false })));
+    return { sha: sha256(dbPath), files: fs.readdirSync(tmpDir).sort() };
+  }
+
+  it.each([
+    ['not a database', (b: string) => fs.writeFileSync(b, 'not a database at all '.repeat(200))],
+    ['empty, which quick_check alone accepts', (b: string) => fs.writeFileSync(b, '')],
+    [
+      'missing the last applied migration',
+      (b: string) => {
+        fs.copyFileSync(dbPath, b);
+        const db = new SQLite(b);
+        db.prepare('DELETE FROM kysely_migration WHERE name = ?').run(PRODUCTION_LATEST);
+        db.close();
+      },
+    ],
+  ])(
+    'enters MIGRATION_INTERRUPTED and touches nothing when the backup is %s',
+    async (_label, write) => {
+      // Break: restoring a backup that only exists, e.g. an empty file the
+      // server would treat as a fresh install and come up empty.
+      const before = await stageSentinel(write);
+      const status = new SystemStatus();
+      await initializeDatabase(status, { dbPath });
+      await closeDatabaseForTest();
+      expect(status.getState().reasonCode).toBe('MIGRATION_INTERRUPTED');
+      expect(sha256(dbPath)).toBe(before.sha);
+      expect(fs.readdirSync(tmpDir).sort()).toEqual(before.files);
+    },
+  );
+
+  it('keeps the database and the sentinel when the restore copy fails part-way', async () => {
+    const before = await stageSentinel((b) => fs.copyFileSync(dbPath, b));
+    const spy = vi.spyOn(fs, 'copyFileSync').mockImplementation((_src, dest) => {
+      fs.writeFileSync(dest as string, 'torn');
+      throw new Error('intentional mid-copy failure');
+    });
+    const status = new SystemStatus();
+    const entered = vi.spyOn(status, 'enterReadOnly');
+    try {
+      await initializeDatabase(status, { dbPath });
+    } finally {
+      spy.mockRestore();
+    }
+    await closeDatabaseForTest();
+    expect(status.getState().reasonCode).toBe('MIGRATION_INTERRUPTED');
+    expect(entered).toHaveBeenCalledWith(
+      'MIGRATION_INTERRUPTED',
+      expect.stringMatching(/^restoring .+ failed/),
+    );
+    expect(entered).toHaveBeenCalledWith(
+      'MIGRATION_INTERRUPTED',
+      expect.stringContaining(sentinel()),
+    );
+    expect(sha256(dbPath)).toBe(before.sha);
+    expect(fs.readdirSync(tmpDir).sort()).toEqual(before.files);
+  });
+
+  // Fails only the sentinel's unlink, with EACCES.
+  function failSentinelUnlink(): { mockRestore(): void } {
+    const unlink = fs.unlinkSync;
+    return vi.spyOn(fs, 'unlinkSync').mockImplementation((p) => {
+      if (p === sentinel()) {
+        throw Object.assign(new Error('intentional EACCES'), { code: 'EACCES' });
+      }
+      unlink(p);
+    });
+  }
+
+  it('enters MIGRATION_INTERRUPTED when the sentinel cannot be removed after its restore', async () => {
+    await stageSentinel((b) => fs.copyFileSync(dbPath, b));
+    const spy = failSentinelUnlink();
+    const status = new SystemStatus();
+    const entered = vi.spyOn(status, 'enterReadOnly');
+    try {
+      await initializeDatabase(status, { dbPath });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(status.getState().reasonCode).toBe('MIGRATION_INTERRUPTED');
+    expect(entered).toHaveBeenCalledWith(
+      'MIGRATION_INTERRUPTED',
+      expect.stringContaining(`restored ${backupPath()}`),
+    );
+    expect(fs.existsSync(sentinel())).toBe(true);
+    // Stopped there: no backup or migrate ran on the restored file.
+    expect(tables(dbPath)).not.toContain('partial');
+  });
+
+  it('enters MIGRATION_INTERRUPTED when the sentinel cannot be removed after a successful migration', async () => {
+    // Break: coming up writable with a sentinel that would restore the
+    // pre-migration backup over this boot's writes on the next one.
+    await migrateToProductionLatest();
+    __setMigrationProviderForTest(buildProvider(partialMigration({ value: false })));
+    const spy = failSentinelUnlink();
+    const status = new SystemStatus();
+    const entered = vi.spyOn(status, 'enterReadOnly');
+    try {
+      await initializeDatabase(status, { dbPath });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(status.getState().reasonCode).toBe('MIGRATION_INTERRUPTED');
+    expect(entered).toHaveBeenCalledWith(
+      'MIGRATION_INTERRUPTED',
+      expect.stringContaining('the migration succeeded'),
+    );
+    expect(fs.existsSync(sentinel())).toBe(true);
+  });
+
+  it('stays MIGRATION_FAILED_RESTORED when the sentinel cannot be removed after a failed migration', async () => {
+    await migrateToProductionLatest();
+    __setMigrationProviderForTest(buildProvider(partialMigration({ value: true })));
+    const spy = failSentinelUnlink();
+    const error = vi.spyOn(dbLogger, 'error');
+    const status = new SystemStatus();
+    try {
+      await initializeDatabase(status, { dbPath });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(status.getState().reasonCode).toBe('MIGRATION_FAILED_RESTORED');
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining('Could not remove the migration sentinel'),
+    );
+    expect(fs.existsSync(sentinel())).toBe(true);
+  });
+
+  it('refuses a newer database before looking at the sentinel', async () => {
+    // Break: restoring over a database this build must not touch (T-006).
+    await stageSentinel((b) => fs.copyFileSync(dbPath, b));
+    const db = new SQLite(dbPath);
+    db.prepare('INSERT INTO kysely_migration (name, timestamp) VALUES (?, ?)').run(
+      'm099_future',
+      '2026-11-22T00:00:00.000Z',
+    );
+    db.close();
+    const before = { sha: sha256(dbPath), files: fs.readdirSync(tmpDir).sort() };
+    const status = new SystemStatus();
+    await initializeDatabase(status, { dbPath });
+    await closeDatabaseForTest();
+    expect(status.getState().reasonCode).toBe('DB_NEWER_THAN_SERVER');
+    expect(sha256(dbPath)).toBe(before.sha);
+    expect(fs.readdirSync(tmpDir).sort()).toEqual(before.files);
+  });
+
+  it('refuses a backup a newer build wrote, touching nothing', async () => {
+    // Break: the restore brings in a newer database, which is then backed up,
+    // migrated and served.
+    const before = await stageSentinel((b) => {
+      fs.copyFileSync(dbPath, b);
+      const db = new SQLite(b);
+      db.prepare('INSERT INTO kysely_migration (name, timestamp) VALUES (?, ?)').run(
+        'm099_future',
+        '2026-11-22T00:00:00.000Z',
+      );
+      db.close();
+    });
+    let ran = false;
+    __setMigrationProviderForTest(
+      buildProvider({
+        m950_test_partial: {
+          async up() {
+            ran = true;
+          },
+          async down() {
+            return;
+          },
+        },
+      }),
+    );
+    const status = new SystemStatus();
+    await initializeDatabase(status, { dbPath });
+    await closeDatabaseForTest();
+    expect(status.getState().reasonCode).toBe('MIGRATION_INTERRUPTED');
+    expect(ran).toBe(false);
+    expect(sha256(dbPath)).toBe(before.sha);
+    expect(fs.readdirSync(tmpDir).sort()).toEqual(before.files);
   });
 });

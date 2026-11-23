@@ -12,7 +12,7 @@ Tests for the Phase 3 Vue UI when the AstrOs.Server enters read-only mode (Phase
 
 ## Forcing read-only mode
 
-Four ways to put the server into read-only mode for testing. Pick whichever matches the scenario. (`DB_NEWER_THAN_SERVER` is not a substitute for cases 1–8: it replaces the UI and blocks login and panic. See § Incompatible (newer) database.)
+Five ways to put the server into read-only mode for testing. Pick whichever matches the scenario. (`DB_NEWER_THAN_SERVER` is not a substitute for cases 1–8: it replaces the UI and blocks login and panic. See § Incompatible (newer) database.)
 
 1. **`STARTUP_OPEN_FAILED`** — point `DATABASE_PATH` at a directory:
    ```bash
@@ -31,7 +31,9 @@ Four ways to put the server into read-only mode for testing. Pick whichever matc
 
 3. **`MIGRATION_FAILED_RESTORED`** — inject a migration that throws but leave the backup mechanism intact. The system rolls back to the prior version and enters read-only with this code so operators are forced to notice and investigate. Easiest from the integration tests (`database.integration.test.ts`).
 
-4. **`MIGRATION_FAILED_RESTORE_FAILED`** — inject a migration that throws *and* mock `fs.copyFileSync` to throw too. Mostly observable via tests, not manual QA.
+4. **`MIGRATION_FAILED_RESTORE_FAILED`** — inject a migration that throws, and make the restore fail by creating a directory where its temp copy goes: `mkdir <dbDir>/database.sqlite3.restore-tmp` (remove it afterwards). See case 18.
+
+5. **`MIGRATION_INTERRUPTED`** — stage a migration sentinel whose backup is missing (case 16).
 
 For most cases, scenario 1 is fastest.
 
@@ -194,12 +196,71 @@ curl -s -i localhost:3000/api/system/status
 **Pass:** cases 9 and 12 hold exactly as above. Nothing is applied and no `.backup-*` file appears, even though this build has migrations the database lacks.
 **Fail:** any `Created pre-migration backup` or `migration "…" was executed` line, or `MIGRATION_FAILED_RESTORED` instead of `DB_NEWER_THAN_SERVER`.
 
+## Interrupted migration (T-016)
+
+A migration run writes `<db>.migration-in-progress` (JSON: `backupPath`, `lastApplied`, `startedAt`) after its backup and removes it when the run ends. A boot that finds one restores the named backup before doing anything else, so a power cut mid-migration can't cost the only good copy.
+
+### Preconditions
+
+- Work on a **copy** of the dev database at this build's latest migration, as in the incompatible-database preconditions above (`/tmp/astros-interrupted/database.sqlite3`).
+- Start the API against it with `DATABASE_PATH=/tmp/astros-interrupted` (the same command as above).
+
+### 15. A leftover sentinel with a good backup is restored
+
+1. With the API stopped, stage an interrupted run by hand:
+   ```bash
+   cd /tmp/astros-interrupted
+   cp database.sqlite3 database.sqlite3.backup-manual
+   # lastApplied must name a migration the backup records, or the backup is refused
+   LAST=$(sqlite3 database.sqlite3 "SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1")
+   echo "{\"backupPath\":\"/tmp/astros-interrupted/database.sqlite3.backup-manual\",\"lastApplied\":\"$LAST\",\"startedAt\":\"2026-11-22T00:00:00.000Z\"}" > database.sqlite3.migration-in-progress
+   ```
+2. Start the API.
+3. **Pass:**
+   - the log shows `Restored /tmp/astros-interrupted/database.sqlite3.backup-manual after an interrupted migration (started 2026-11-22T00:00:00.000Z)`
+   - the server comes up normally (no banner)
+   - `database.sqlite3.migration-in-progress` is gone
+
+### 16. A sentinel whose backup is missing or damaged stops everything
+
+1. Stage a sentinel as in case 15 but pointing at a backup that doesn't exist, and record `sha256sum database.sqlite3` and `ls`.
+2. Start the API.
+3. **Pass:**
+   - the banner shows "A schema migration run did not finish cleanly, and automatic recovery stopped…" (`MIGRATION_INTERRUPTED`)
+   - the log names the sentinel and the missing backup
+   - the database's sha256 and the directory listing are unchanged: no backup, migrate or prune ran
+4. Repeat with the sentinel's content replaced by `{`. **Pass:** the same, with "the sentinel is unreadable".
+5. Repeat with a backup that exists but is empty (`: > database.sqlite3.backup-manual`) and the case 15 sentinel. **Pass:** the same, with "has no record of migration …": an empty file must not be restored as a fresh install.
+6. **Recovery:**
+   - restore a known-good copy by hand, or delete the sentinel if the database is known good
+   - restart: the banner clears
+
+### 17. A migration interrupted mid-run (optional, needs a code stub)
+
+1. Temporarily add a test-range migration (e.g. `m950_test_slow`) to `PRODUCTION_MIGRATIONS` that creates a table and then waits 30 s.
+2. With the API stopped, keep a copy of the pre-migration database: `cp database.sqlite3 /tmp/astros-pre-migration.sqlite3`.
+3. Start the API, and `kill -9` it during the wait. Revert the stub.
+4. Restart with the stub reverted.
+5. **Pass:** the restore log line appears, the half-made table is gone, and the database's tables match `/tmp/astros-pre-migration.sqlite3` (`sqlite3 … ".tables"` on both). Only the restore after a leftover sentinel is automated (`database.integration.test.ts` § an interrupted migration); the kill itself is manual.
+
+### 18. The reviewer's reproduction: a failed restore keeps the backup safe
+
+1. Temporarily add a test-range migration (e.g. `m950_test_partial`) to `PRODUCTION_MIGRATIONS` that creates a table `partial` and then throws.
+2. With the API stopped, `mkdir /tmp/astros-interrupted/database.sqlite3.restore-tmp` so the restore fails.
+3. Start the API. **Pass:** the banner shows the restore-failed message ("A schema migration failed and the automatic restore also failed…", `MIGRATION_FAILED_RESTORE_FAILED`), and `database.sqlite3.migration-in-progress` is present.
+4. Stop the API, `rmdir` the `.restore-tmp` directory, and change the stub so it no longer throws. (Forgetting the `rmdir` makes the next boot's sentinel restore fail too: the `MIGRATION_INTERRUPTED` banner, with the sentinel kept.)
+5. Start the API. **Pass:**
+   - the log shows `Restored …backup-<last> after an interrupted migration …`, then the migration runs
+   - no banner, and the sentinel is gone
+   - the backup still has no `partial` table: `sqlite3 database.sqlite3.backup-<last> ".tables"`
+6. Revert the stub.
+
 ## Storybook spot-check
 
 Run `cd astros_vue && npm run storybook`. Navigate to "Components / Common / AstrosSystemStatusBanner". Verify each story renders without console errors:
 
 - `Hidden` — no banner visible, only the placeholder text.
-- `StartupOpenFailed`, `BackupFailed`, `MigrationFailedNoBackup`, `MigrationFailedRestored`, `MigrationFailedRestoreFailed`, `DbNewerThanServer` — each shows the banner with the corresponding localized message.
+- `StartupOpenFailed`, `BackupFailed`, `MigrationFailedNoBackup`, `MigrationFailedRestored`, `MigrationFailedRestoreFailed`, `MigrationInterrupted`, `DbNewerThanServer` — each shows the banner with the corresponding localized message.
 - `UnknownReasonCode`, `NoReasonCode` — both show the UNKNOWN fallback.
 
 Then open "Components / Common / AstrosIncompatibleDatabaseNotice" → `Default`: the notice card renders over the schematic, with the title, message and action line, and with nothing to click.

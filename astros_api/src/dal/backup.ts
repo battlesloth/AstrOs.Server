@@ -62,7 +62,7 @@ export function compareMigrationNames(a: string, b: string): number {
   return a.localeCompare(b);
 }
 
-async function getProviderMigrationNames(provider: MigrationProvider): Promise<string[]> {
+export async function getProviderMigrationNames(provider: MigrationProvider): Promise<string[]> {
   const map = await provider.getMigrations();
   return Object.keys(map).sort(compareMigrationNames);
 }
@@ -156,6 +156,207 @@ export function pruneOldBackups(dbPath: string, keep = 5): void {
   }
 }
 
+// Atomic (T-016 amendment): copyFileSync truncates its target first, so the
+// copy goes to a temp file, fsynced, then renamed over dbPath. A power cut or
+// a full disk mid-restore leaves the old file whole, never a truncated one the
+// next boot can't read. The caller must have closed its connection to dbPath.
+// It refuses while a -journal or -wal sits beside dbPath: SQLite would replay
+// the old file's journal onto the restored one, a silent mix of both that
+// still passes quick_check. A read of dbPath rolls a hot journal back first.
 export function restoreBackup(backupPath: string, dbPath: string): void {
-  fs.copyFileSync(backupPath, dbPath);
+  for (const suffix of ['-journal', '-wal']) {
+    if (fs.existsSync(`${dbPath}${suffix}`)) {
+      throw new Error(`not restoring over ${dbPath} while ${dbPath}${suffix} exists`);
+    }
+  }
+  const tmp = `${dbPath}.restore-tmp`;
+  try {
+    fs.copyFileSync(backupPath, tmp);
+    fsyncFile(tmp);
+    fs.renameSync(tmp, dbPath);
+  } catch (err) {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      // best effort: the copy may never have created it
+    }
+    throw err;
+  }
+  fsyncDirectory(path.dirname(dbPath));
+}
+
+// Windows can only flush a handle opened for writing; elsewhere a read-only
+// handle works, and a backup without owner-write still restores.
+function fsyncFile(file: string): void {
+  const fd = fs.openSync(file, process.platform === 'win32' ? 'r+' : 'r');
+  try {
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+// T-016: a migration-in-progress sentinel names the backup a migration run
+// started from. A boot that finds one must restore that backup instead of
+// taking a new one: createBackup replaces the file of the same name, which
+// would overwrite the only good copy with a half-migrated database.
+export interface MigrationSentinel {
+  backupPath: string;
+  lastApplied: string;
+  startedAt: string;
+}
+
+export function migrationSentinelPath(dbFile: string): string {
+  return `${dbFile}.migration-in-progress`;
+}
+
+// The rename is only durable once the directory entry is: fsync the directory
+// too. Platforms that can't open a directory for fsync (Windows dev machines)
+// skip it.
+function fsyncDirectory(dir: string): void {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(dir, 'r');
+    fs.fsyncSync(fd);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== 'EPERM' && code !== 'EISDIR' && code !== 'EINVAL') {
+      throw err;
+    }
+    logger.debug(`Directory fsync not supported for ${dir} (${code}); skipped`);
+  } finally {
+    if (fd !== undefined) {
+      fs.closeSync(fd);
+    }
+  }
+}
+
+// Written atomically: a temp file, fsynced, renamed into place. A failure
+// throws and never leaves a partial sentinel. One before the rename leaves
+// none; only the directory fsync after it can throw with the complete
+// sentinel in place, which the next boot restores harmlessly (its backup is
+// identical to the unmigrated database).
+export function writeMigrationSentinel(
+  dbFile: string,
+  entry: { backupPath: string; lastApplied: string },
+): void {
+  const target = migrationSentinelPath(dbFile);
+  const tmp = `${target}.tmp`;
+  const body: MigrationSentinel = { ...entry, startedAt: new Date().toISOString() };
+  try {
+    const fd = fs.openSync(tmp, 'w');
+    try {
+      fs.writeFileSync(fd, JSON.stringify(body)); // loops on a short write
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    fs.renameSync(tmp, target);
+  } catch (err) {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      // best effort: the tmp file may never have been created
+    }
+    throw err;
+  }
+  fsyncDirectory(path.dirname(target));
+}
+
+// null: no sentinel. 'unreadable': one exists but can't be trusted (not JSON,
+// missing fields, not a file); the caller must not treat that as absent.
+export function readMigrationSentinel(dbFile: string): MigrationSentinel | 'unreadable' | null {
+  let text: string;
+  try {
+    text = fs.readFileSync(migrationSentinelPath(dbFile), 'utf8');
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'ENOENT' ? null : 'unreadable';
+  }
+  try {
+    const value = JSON.parse(text) as Partial<MigrationSentinel> | null;
+    if (
+      typeof value?.backupPath === 'string' &&
+      typeof value.lastApplied === 'string' &&
+      typeof value.startedAt === 'string'
+    ) {
+      return {
+        backupPath: value.backupPath,
+        lastApplied: value.lastApplied,
+        startedAt: value.startedAt,
+      };
+    }
+  } catch {
+    // not JSON: unreadable below
+  }
+  return 'unreadable';
+}
+
+// The unlink is fsynced like the write: a sentinel a power cut brings back
+// would restore the pre-migration backup over everything written since.
+export function removeMigrationSentinel(dbFile: string): void {
+  const target = migrationSentinelPath(dbFile);
+  try {
+    fs.unlinkSync(target);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return;
+    }
+    throw err;
+  }
+  fsyncDirectory(path.dirname(target));
+}
+
+// Why the backup a sentinel names can't be restored, or null if it can. It
+// must exist, pass quick_check, and record the sentinel's last applied
+// migration (T-016 amendment): quick_check answers ok for an empty file, and
+// restoring one would look like a fresh install that migrates from scratch.
+// It must also hold no migration outside `known` (this build's), so a backup a
+// newer build wrote is refused before anything is restored (T-006).
+// Opened read-only, so nothing is created beside it.
+export function sentinelBackupProblem(
+  sentinel: Pick<MigrationSentinel, 'backupPath' | 'lastApplied'>,
+  known: ReadonlySet<string>,
+): string | null {
+  const { backupPath, lastApplied } = sentinel;
+  if (!fs.existsSync(backupPath)) {
+    return `its backup ${backupPath} is missing`;
+  }
+  let backup: SQLite.Database;
+  try {
+    backup = new SQLite(backupPath, { readonly: true, fileMustExist: true });
+  } catch (err) {
+    return `its backup ${backupPath} can't be opened (${(err as Error).message})`;
+  }
+  try {
+    const result = backup.pragma('quick_check', { simple: true });
+    if (result !== 'ok') {
+      return `its backup ${backupPath} fails quick_check (${String(result)})`;
+    }
+    const hasTable = backup
+      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .get(KYSELY_MIGRATION_TABLE);
+    const hasRow =
+      hasTable &&
+      backup.prepare(`SELECT 1 FROM ${KYSELY_MIGRATION_TABLE} WHERE name = ?`).get(lastApplied);
+    if (!hasRow) {
+      return `its backup ${backupPath} has no record of migration ${lastApplied}`;
+    }
+    const unknown = (
+      backup.prepare(`SELECT name FROM ${KYSELY_MIGRATION_TABLE}`).all() as { name: string }[]
+    )
+      .map((r) => r.name)
+      .filter((n) => !known.has(n))
+      .sort(compareMigrationNames);
+    if (unknown.length > 0) {
+      return (
+        `its backup ${backupPath} was written by a newer build ` +
+        `(migrations this build does not know: ${unknown.join(', ')})`
+      );
+    }
+    return null;
+  } catch (err) {
+    return `its backup ${backupPath} can't be read (${(err as Error).message})`;
+  } finally {
+    backup.close();
+  }
 }

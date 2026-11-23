@@ -243,6 +243,12 @@ From the T-012 pre-push review (2026-11-22; all pre-existing, not T-012 regressi
 - **The newer-database guard's message joins unknown names with `, `.** An empty or space-padded name from a tampered row is then invisible. Use `JSON.stringify` per name.
 - **`getLastAppliedMigrationName` returns `null` when applied rows exist but none is known.** A caller can't tell that from a fresh database, which skips the backup. It's safe today only because `initializeDatabase` checks for unknown migrations first. Throwing would protect a future caller.
 
+From the T-016 reviews (2026-11-22, pre-existing in `initializeDatabase`):
+
+- **The `STARTUP_OPEN_FAILED` catch opens `:memory:` without closing a file connection that is already open.** The open succeeded, but a later read threw. The handle leaks until exit, which matters only to tests that boot twice. T-016's post-restore reopen also lands here.
+- **A throw from `pruneOldBackups` (`readdir`/`stat`) inside the migrate `try` restores the backup over a successful migration.** It enters `MIGRATION_FAILED_RESTORED` for a run that worked. Move the prune out of the `try`, or catch and log it.
+- **An `'unreadable'` migration sentinel drops its cause.** The detail can't tell the operator whether it was EACCES or bad JSON (a T-016 deferred minor).
+
 Open local branches (pre-workflow threads, unmerged into `develop`):
 
 - `debug/serial-rx-frame-diag` — temp serial-RX + deploy-route diagnostics

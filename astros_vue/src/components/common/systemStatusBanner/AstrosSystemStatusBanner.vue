@@ -18,6 +18,7 @@ const KNOWN_CODES = {
   MIGRATION_FAILED_RESTORED: true,
   MIGRATION_FAILED_RESTORE_FAILED: true,
   DB_NEWER_THAN_SERVER: true,
+  MIGRATION_INTERRUPTED: true,
 } as const satisfies Record<ReadOnlyReasonCode, true>;
 
 const reasonMessage = computed(() => {
