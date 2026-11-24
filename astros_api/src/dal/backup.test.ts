@@ -28,6 +28,9 @@ import {
   sentinelBackupProblem,
 } from './backup.js';
 
+// chmod only restricts a non-root POSIX process.
+const CHMOD_RESTRICTS = process.platform !== 'win32' && process.getuid?.() !== 0;
+
 async function expectedMigrationNames(): Promise<string[]> {
   return Object.keys(await provider.getMigrations()).sort(compareMigrationNames);
 }
@@ -432,6 +435,36 @@ describe('backup module', () => {
       ]);
     });
 
+    it('checks for a -wal before it touches an inert -journal', () => {
+      // Break: deleting the journal and then refusing anyway.
+      const dbPath = path.join(tmpDir, 'database.sqlite3');
+      const backupPath = path.join(tmpDir, 'database.sqlite3.backup-x');
+      fs.writeFileSync(dbPath, 'half-migrated');
+      fs.writeFileSync(`${dbPath}-journal`, '');
+      fs.writeFileSync(`${dbPath}-wal`, 'wal');
+      fs.writeFileSync(backupPath, 'good-data');
+      expect(() => restoreBackup(backupPath, dbPath)).toThrow('-wal');
+      expect(fs.existsSync(`${dbPath}-journal`)).toBe(true);
+    });
+
+    it('logs a temp copy it could not clean up', () => {
+      // Break: swallowing the cleanup error, so what was left behind goes unlogged.
+      const dbPath = path.join(tmpDir, 'database.sqlite3');
+      const backupPath = path.join(tmpDir, 'database.sqlite3.backup-x');
+      fs.writeFileSync(dbPath, 'half-migrated');
+      fs.writeFileSync(backupPath, 'good-data');
+      fs.mkdirSync(`${dbPath}.restore-tmp`);
+      const warn = vi.spyOn(backupLogger, 'warn');
+      try {
+        expect(() => restoreBackup(backupPath, dbPath)).toThrow();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining(`Could not remove ${dbPath}.restore-tmp`),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
     it('overwrites a temp copy a crash left behind', () => {
       const dbPath = path.join(tmpDir, 'database.sqlite3');
       const backupPath = path.join(tmpDir, 'database.sqlite3.backup-x');
@@ -486,7 +519,7 @@ describe('backup module', () => {
       expect(fs.readFileSync(dbPath, 'utf8')).toBe('good-data');
     });
 
-    it.runIf(process.getuid?.() !== 0)('restores a backup without owner-write', () => {
+    it.runIf(CHMOD_RESTRICTS)('restores a backup without owner-write', () => {
       // Break: fsyncing the temp copy (which keeps the backup's mode) through a
       // write handle, which EACCES fails for a non-root process.
       const dbPath = path.join(tmpDir, 'database.sqlite3');
@@ -928,22 +961,19 @@ describe('sentinelBackupProblem', () => {
     );
   });
 
-  it.runIf(process.getuid?.() !== 0)(
-    'reports a backup it cannot access as such, not as missing',
-    () => {
-      // Break: existsSync reading EACCES as absent, which sends the operator
-      // looking for a file that is there.
-      writeBackup(['9_x']);
-      fs.chmodSync(dir, 0o000);
-      try {
-        expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toMatch(
-          /can't be accessed \(EACCES\)/,
-        );
-      } finally {
-        fs.chmodSync(dir, 0o700);
-      }
-    },
-  );
+  it.runIf(CHMOD_RESTRICTS)('reports a backup it cannot access as such, not as missing', () => {
+    // Break: existsSync reading EACCES as absent, which sends the operator
+    // looking for a file that is there.
+    writeBackup(['9_x']);
+    fs.chmodSync(dir, 0o000);
+    try {
+      expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toMatch(
+        /can't be accessed \(EACCES\)/,
+      );
+    } finally {
+      fs.chmodSync(dir, 0o700);
+    }
+  });
 
   it('rejects a backup without the last applied migration', () => {
     writeBackup(['8_x']);

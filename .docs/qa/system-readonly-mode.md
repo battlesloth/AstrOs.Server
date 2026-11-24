@@ -226,14 +226,23 @@ A migration run writes `<db>.migration-in-progress` (JSON: `backupPath`, `lastAp
 1. Stage a sentinel as in case 15 but pointing at a backup that doesn't exist, and record `sha256sum database.sqlite3` and `ls`.
 2. Start the API.
 3. **Pass:**
-   - the banner shows "A schema migration run did not finish cleanly, and automatic recovery stopped…" (`MIGRATION_INTERRUPTED`)
-   - the log names the sentinel and the missing backup
+   - the banner shows "A schema migration run did not finish cleanly…" (`MIGRATION_INTERRUPTED`)
+   - the log names the sentinel and the missing backup, says nothing was restored, backed up or migrated, and says to put a good copy of the backup (never the database) at its path and to delete nothing
    - the database's sha256 and the directory listing are unchanged: nothing was restored. (With nothing pending, no backup or migrate would run anyway; the automated tests cover that with a pending migration.)
-4. Repeat with the sentinel's content replaced by `{`. **Pass:** the same, except the log says "the sentinel is unreadable" and lists the backup candidates instead of naming one.
-5. Repeat with a backup that exists but is empty (`: > database.sqlite3.backup-manual`) and the case 15 sentinel. **Pass:** the same, with "has no record of migration …": an empty file must not be restored as a fresh install.
-6. **Recovery:**
-   - follow the detail's recovery line: stop the server, copy a known-good backup over the database, then delete the sentinel (deleting only the sentinel is safe just when the database is known good)
-   - restart: the banner clears
+4. Repeat with the sentinel's content replaced by `{`. **Pass:** the same, except the log says "that file is unreadable" and names no backup.
+5. With the API stopped, run the case 15 staging again, keep a good copy of the backup (`cp database.sqlite3.backup-manual /tmp/astros-good-backup.sqlite3`), change the database so it differs (`sqlite3 database.sqlite3 'CREATE TABLE half (id INTEGER)'`), then empty the backup (`: > database.sqlite3.backup-manual`) and start the API. **Pass:** the same, with "has no record of migration …": an empty file must not be restored as a fresh install.
+6. **Recovery**, as the log says: move the empty file away (`mkdir bad-backup && mv database.sqlite3.backup-manual bad-backup/`), put the good copy back (`cp /tmp/astros-good-backup.sqlite3 database.sqlite3.backup-manual`) and restart. **Pass:**
+   - the log shows the `Restored …` line, there is no banner, and the sentinel is gone
+   - with the API stopped again, `sqlite3 database.sqlite3 .dump | sha256sum` equals the same for `/tmp/astros-good-backup.sqlite3` (so `half` is gone)
+
+### 16a. A damaged database is moved away, and the server restores its backup
+
+1. With the API stopped, run the case 15 staging, keep a good copy of the backup as in case 16, and tear the database's header: `head -c 100 /dev/zero | tr '\0' '\377' | dd of=database.sqlite3 conv=notrunc`.
+2. Start the API. **Pass:**
+   - the `STARTUP_OPEN_FAILED` banner, on a page that was already open and logged in (the in-memory database has no users, so a new login fails)
+   - the log says `A migration run did not finish cleanly (…)`: fix the startup error and restart; if the database itself is damaged, move it into a new folder first; delete nothing
+3. Do that: stop the API, `mkdir damaged && mv database.sqlite3 damaged/` (and any `-journal` or `-wal` beside it), start it again. **Pass:** the `Restored …` line, no banner, and the same `.dump` hash as the good copy.
+4. Repeat steps 1–3, emptying the backup after step 1 and moving into a new folder (`damaged-2`). **Pass:** step 3's start shows the `MIGRATION_INTERRUPTED` banner ("has no record of migration …"), never an empty writable server. Then recover as in case 16, step 6, with another folder name (`bad-backup-2`).
 
 ### 17. A migration interrupted mid-run (optional, needs a code stub)
 
@@ -247,7 +256,7 @@ A migration run writes `<db>.migration-in-progress` (JSON: `backupPath`, `lastAp
 
 1. Temporarily add a test-range migration (e.g. `m950_test_partial`) to `PRODUCTION_MIGRATIONS` that creates a table `partial` and then throws.
 2. With the API stopped, `mkdir /tmp/astros-interrupted/database.sqlite3.restore-tmp` so the restore fails.
-3. Start the API. **Pass:** the banner shows the restore-failed message ("A schema migration failed and the automatic restore also failed…", `MIGRATION_FAILED_RESTORE_FAILED`), and `database.sqlite3.migration-in-progress` is present.
+3. Start the API. **Pass:** the banner shows the restore-failed message ("A schema migration failed and the automatic restore also failed…", `MIGRATION_FAILED_RESTORE_FAILED`), `database.sqlite3.migration-in-progress` is present, and the log says it was kept, that the next boot retries the restore of the named backup, and to delete nothing.
 4. Stop the API, `rmdir` the `.restore-tmp` directory, and change the stub so it no longer throws. (Forgetting the `rmdir` makes the next boot's sentinel restore fail too: the `MIGRATION_INTERRUPTED` banner, with the sentinel kept.)
 5. Start the API. **Pass:**
    - the log shows `Restored …backup-<last> after an interrupted migration …`, then the migration runs

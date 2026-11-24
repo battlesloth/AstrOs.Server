@@ -223,10 +223,7 @@ function unlinkBestEffort(file: string): void {
 
 // Node's fsync errors name no file; these name it.
 function withPath(err: unknown, what: string): Error {
-  return Object.assign(new Error(`${what} failed: ${(err as Error).message}`), {
-    code: (err as NodeJS.ErrnoException).code,
-    cause: err,
-  });
+  return new Error(`${what} failed: ${(err as Error).message}`);
 }
 
 // Windows can only flush a handle opened for writing; elsewhere a read-only
@@ -361,7 +358,8 @@ export function removeMigrationSentinel(dbFile: string): void {
 // restoring one would look like a fresh install that migrates from scratch.
 // It must also hold no migration outside `known` (this build's), so a backup a
 // newer build wrote is refused before anything is restored (T-006).
-// Opened read-only, so nothing is created beside it.
+// Opened read-only: nothing is created beside a backup in the rollback-journal
+// mode this app uses.
 export function sentinelBackupProblem(
   sentinel: Pick<MigrationSentinel, 'backupPath' | 'lastApplied'>,
   known: ReadonlySet<string>,

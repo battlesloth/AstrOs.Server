@@ -46,9 +46,10 @@ The reviewer reproduced it: a migration that creates a table and then throws, wi
 - **Accepted risk: a rollback to a pre-T-016 build.**
   - The scenario: a migration run (e.g. T-013's `m010`) is interrupted, or its restore fails, and the operator rolls back to a server build without T-016. That build ignores the sentinel. The sentinel's migration isn't recorded, so nothing is pending and it runs normally on the half-migrated file. A later upgrade finds the sentinel and restores the old backup over everything written since.
   - Jeff accepted it: it needs a failed migration, a rollback and a re-upgrade. No release sequencing or code is added for it.
-- **Ruling, not approved by Jeff: confirm.** An implementation detail of the atomic restore, from the re-review and the pre-push review, not part of the amendment Jeff approved.
+- **Journals beside the database (Jeff, 2026-11-23).** Added by Claude in the review fix passes and confirmed by Jeff afterwards, separately from the atomic-restore amendment:
   - `restoreBackup` throws before copying while a hot `<dbFile>-journal` (non-empty, non-zero first byte) or any `-wal` exists. A rename over a hot journal lets SQLite replay it onto the restored file.
   - It removes an inert journal (empty or zero first byte, SQLite's own "not hot" test) with a `warn` and continues, because no read ever clears one.
+- **An unreadable sentinel's detail names only the sentinel (Jeff, 2026-11-23;** amends "the detail names the sentinel and the backup path"). The backup's path is inside the file it can't read, and guessing one from the database could name the wrong backup. Every other `MIGRATION_INTERRUPTED` detail names both.
 - **Note:** the Vue mirror of `ReadOnlyReasonCode` is `astros_vue/src/types/systemStatus.ts`, which `models/websocket/systemStatusMessage.ts` imports. The Contract named the importer. The `systemStatus` store itself needed no change; only its spec's plain-code list did.
 
 ## Task
@@ -110,8 +111,9 @@ The reviewer reproduced it: a migration that creates a table and then throws, wi
 | stat the backup | EACCES / ENOTDIR / … | `MIGRATION_INTERRUPTED`: "its backup … can't be accessed (CODE)", not "missing" (pre-push) |
 | `-journal` beside the DB at restore | empty or zero first byte (inert) | removed with a `warn`, restore continues (pre-push) |
 | reopen after a sentinel restore | any | `STARTUP_OPEN_FAILED`; the sentinel is kept (removal comes after the reopen), so the next boot restores again |
-| any startup read, with a sentinel present | `SQLITE_CORRUPT` / not a database (a torn half-migrated file) | `STARTUP_OPEN_FAILED`, plus an `error` line naming the sentinel and the backup to copy back by hand (pre-push) |
-| unlink a temp file after a failure | anything but ENOENT | logged `warn`; the next write or copy overwrites it |
+| any startup read, with a sentinel present | `SQLITE_CORRUPT` / not a database (a torn half-migrated file), or a passing error (locked, permissions) | `STARTUP_OPEN_FAILED`, plus an `error` line: fix the error and restart, or move a damaged database into a new folder and restart; either way the next boot runs the checked restore (follow-up) |
+| restore after a failed migration | any | `MIGRATION_FAILED_RESTORE_FAILED`, plus, if the sentinel exists, an `error` line saying it was kept, the next boot retries, and to delete nothing (follow-up) |
+| unlink a temp file after a failure | anything but ENOENT | logged `warn`; the next write or copy overwrites it (a directory in its place keeps failing until it is removed) |
 | unlink the sentinel | EACCES | after a sentinel restore or a successful migration: enter `MIGRATION_INTERRUPTED`, since a stale sentinel would restore over good data next boot. After a failed-migration restore: log `error` and keep `MIGRATION_FAILED_RESTORED`, because the next boot restores the same backup again, which is harmless while read-only blocks writes |
 | fsync the dir after the unlink | EIO | throw, handled as the unlink's EACCES |
 | the backup lacks a `kysely_migration` row for `lastApplied` (or is empty) | — | `MIGRATION_INTERRUPTED` (amendment) |
@@ -127,7 +129,7 @@ The reviewer reproduced it: a migration that creates a table and then throws, wi
 | sentinel written | pre-migration | good | present | restore (no-op content), migrate | consistent ✓ |
 | mid-migration | partial (+ hot `-journal` if mid-statement) | good | present | the newer-database read rolls the journal back, then restore good, migrate | consistent ✓ (the bug) |
 | mid-migration, before the journal's first fsync | partial (+ inert `-journal`) | good | present | the restore removes the inert journal, then restore good, migrate | consistent ✓ (pre-push) |
-| mid-migration, torn page | unreadable | good | present | `STARTUP_OPEN_FAILED`, naming the sentinel and its backup (manual copy) | manual ✓ |
+| mid-migration, torn page | unreadable | good | present | `STARTUP_OPEN_FAILED`; the operator moves the file away and restarts, and the server restores | manual ✓ |
 | migration done, before sentinel removal | migrated | good | present | restore good, re-migrate | consistent ✓ (repeats work) |
 | failed migration, mid-restore copy | partial (the copy went to `.restore-tmp`; amendment) | good | present | restore good again | consistent ✓ |
 | successful restore, before sentinel removal | good | good | present | restore again (idempotent), migrate | consistent ✓ |
@@ -154,12 +156,13 @@ The reviewer reproduced it: a migration that creates a table and then throws, wi
 - [x] RED → GREEN: `writeMigrationSentinel` / `readMigrationSentinel` / `removeMigrationSentinel` in `dal/backup.ts` (`backup.test.ts`): round-trip, atomic write leaves no `.tmp`, absent → `null`, corrupt or missing fields → `'unreadable'`
 - [x] RED → GREEN: `initializeDatabase` sentinel steps (`database.integration.test.ts`): the reviewer's reproduction, success and restored-failure leave no sentinel, missing backup and corrupt sentinel → `MIGRATION_INTERRUPTED` with nothing touched, leftover-after-success restores and re-migrates, a failed sentinel write → `BACKUP_FAILED`; mutation-check the sentinel check
 - [x] `MIGRATION_INTERRUPTED` in `ReadOnlyReasonCode` (API), the Vue mirror and store, the `enUS.json` banner message, store/banner specs
-- [x] Pre-commit review fix pass (Review notes): atomic `restoreBackup`, `sentinelBackupProblem` with the `lastApplied` row, removal fsync, per-site details, the newer-backup refusal (the first pass's post-restore check, replaced in the re-review), coverage tests; mutations caught for each guard
+- [x] Pre-commit review fix pass (Review notes): atomic `restoreBackup`, `sentinelBackupProblem` with the `lastApplied` row, removal fsync, per-site details, the newer-backup refusal (the first pass's post-restore check, replaced in the re-review), coverage tests; the mutations caught are the ones listed in Review notes
 - [x] QA `system-readonly-mode.md` cases 15–18 and the trigger / Storybook lists
 - [ ] PLAN.md
 - [x] Pre-commit: api prettier + lint, build, vitest; vue format + lint, build, vitest; code review (two rounds)
-- [x] Manual verification (Verification section, 2026-11-22: a worktree booting the real `ApiServer` on a dev-DB copy, serial skipped; all three steps green, `.dump` sha256 equal)
-- [x] Pre-push `/pr-review-toolkit:review-pr` (5 agents) and its fix pass (Pre-push review notes)
+- [x] Manual verification (Verification section and QA cases 15–18, 2026-11-23, at `12ac0e35`: a worktree booting the real `ApiServer`, serial skipped, on a copy of the dev database `.data/database.sqlite3`, which was at 8; all green, `.dump` sha256 equal). The first run (2026-11-22) was at `6e910cd1`, before the pre-push fixes, and on a copy of `~/.config/astrosserver/database.sqlite3` (at 7), not the dev database.
+- [x] Manual verification of the follow-up (2026-11-23): QA cases 15, 16, 16a, 17 and 18 walked as rewritten, the same way, on the follow-up's `database.ts` and `backup.ts`. All pass; every recovery ends with a `.dump` sha256 equal to the good copy, and the dev database is unchanged. Not run: the Vue banner in a browser, Docker, a Pi.
+- [x] Pre-push `/pr-review-toolkit:review-pr` (5 agents) and its fix pass (Pre-push review notes). Not rerun for the follow-up (Jeff, 2026-11-23).
 
 ## Review notes
 
@@ -171,7 +174,7 @@ No Critical findings. The Important ones were fixed in one pass, except #6:
    - Fixed by the atomic `restoreBackup` (amendment).
    - Tests: a part-way copy failure leaves the database whole, in both the unit and integration tests.
 2. **The `MIGRATION_INTERRUPTED` banner was only right for one of its four entry points.**
-   - The copy is now general: the run didn't finish cleanly, recovery stopped, no backup was deleted, and the marker was kept. The first rewrite still said "the backup was kept", which isn't true when it is missing; the re-review caught that.
+   - The copy is now general: the run didn't finish cleanly, recovery stopped, no backup was deleted, and the marker was kept (reworded again in the follow-up). The first rewrite still said "the backup was kept", which isn't true when it is missing; the re-review caught that.
    - Each site's detail now says what happened: restore failed, restored but not removed, or migrated but not removed.
 3. **Durability on the removal side.**
    - `removeMigrationSentinel` fsyncs the directory after the unlink.
@@ -215,7 +218,7 @@ No Critical findings. Fixed:
    - `restoreBackup` now throws while a `-journal` or `-wal` sits beside the DB.
    - A comment at the sentinel step and an inventory row record it.
    - Tests: a unit `it.each`, mutation-caught.
-2. **The banner said "the pre-migration backup … were kept"**, which is false when it is missing. It now reads "No backup was deleted, and the in-progress marker was kept."
+2. **The banner said "the pre-migration backup … were kept"**, which is false when it is missing. It then read "No backup was deleted, and the in-progress marker was kept." (Reworded in the follow-up: neither half holds in every state.)
 3. **A backup a newer build wrote is now refused before the restore,** as `MIGRATION_INTERRUPTED` touching nothing. Before, it was restored and only then refused as `DB_NEWER_THAN_SERVER`, a state no doc described.
    - Ruling: this is the Contract's "its backup … fails the check" branch, so it is not a new amendment.
    - `sentinelBackupProblem` takes this build's migration names. The post-restore re-check is gone.
@@ -242,8 +245,8 @@ No Critical findings. Fixed in one pass:
 
 1. **The Verification section asked for a sha256 match that can't hold.** SQLite's backup API doesn't write a byte-identical file. Step 3 now compares `.dump` hashes, which the by-hand run did.
 2. **An inert `-journal` blocked the restore on every boot.** A power cut before the journal's first fsync leaves one, and no read clears it. `restoreBackup` now refuses only a hot journal and removes an inert one. Tests: an `it.each` for the empty and zero-header cases.
-3. **A torn half-migrated file reached `STARTUP_OPEN_FAILED` without a word about the sentinel.** The catch now logs the sentinel and the backup to copy back by hand. Tested with a header torn under a staged sentinel.
-4. **The "touches nothing" detail gave no recovery steps,** and the obvious move (delete the marker) would recreate the T-016 bug. Each untouched detail now ends with the safe order: copy a known-good backup (the candidates are listed) over the DB, then delete the sentinel.
+3. **A torn half-migrated file reached `STARTUP_OPEN_FAILED` without a word about the sentinel.** The catch now logs the sentinel and the backup to copy back by hand. Tested with a header torn under a staged sentinel. (It named that backup without checking it: see the follow-up.)
+4. **The "touches nothing" detail gave no recovery steps,** and the obvious move (delete the marker) would recreate the T-016 bug. Each untouched detail now ends with an order to follow: copy a known-good backup (the candidates are listed) over the DB, then delete the sentinel. (That order was not safe beside a hot journal: see the follow-up.)
 5. **Test gaps closed:**
    - the removal after `assertNoFkViolations` (an FK-violating migration whose restore fails keeps the sentinel)
    - a real hot journal staged at boot (rolled back, restored, migrated)
@@ -288,3 +291,54 @@ To the Backlog (decisions, not sweep fixes):
 - `query_only` while a sentinel is kept; plain read-only still runs the serial and WS handlers, which need an audit first
 - one runtime list of reason codes
 - the absolute `backupPath`
+
+### Follow-up (2026-11-23, after the push of `12ac0e35`)
+
+Sources: the mutations the pushed commit hadn't run, a fresh-context review of its late edits, and three rounds with a second fresh-context reviewer over this follow-up's own drafts (never committed). The third found no Critical or Important issues; most of its Minors were then fixed and re-tested, not re-reviewed.
+
+**Corrections to the record.**
+- The `12ac0e35` message says "each guard mutation-checked". That was false for the last fix pass: of 14 mutations not run before the push, 10 survived. The `6e910cd1` message's "Mutations caught for every guard" was false too: closing the connection before the sentinel restore had no test. The "Mutations caught" lists above hold only for what they name.
+- The `6e910cd1` message credits Jeff with the journal rule. He confirmed it afterwards (amendment).
+
+**Unsafe operator guidance.** `12ac0e35` told the operator how to restore by hand. Followed literally (each reproduced):
+- beside a hot journal, SQLite replayed it onto the restored file: writable, `integrity_check` ok, data mixed
+- with a torn database and an empty backup, the named backup was one nobody had checked: a blank, writable server with no banner
+- after a failed restore nothing said to keep the sentinel, and deleting it let the next boot overwrite the good backup, which is the T-016 bug
+
+The first attempt rewrote those steps, and the second review found it still unsafe. It listed the rejected backup as a candidate to copy, offered old backups as known-good, told the operator to move the only copy when there was no backup, and prescribed by-hand work where a restart was enough.
+
+**The fix: none of T-016's messages asks for a restore by hand.** That is left to the server's own checked restore, on the next boot:
+- a bad backup: fix its permissions or lock, run the newer build that wrote it, or move it away and put a good copy at its path, never the database
+- a damaged database: move it into a new folder
+- a failed restore or a startup error: fix the cause
+- an unreadable sentinel: fix its permissions; with damaged contents there is no automatic way out, so copy the data folder before changing anything
+- each of these ends with `KEEP_FILES`: delete nothing, and where the paths are under Docker
+- the three "could not be removed" messages say to keep the backup the next boot will restore
+
+The second round found the first version of that text still let an operator put the half-migrated database at the backup's path, over a damaged backup that could still be read: the check can't tell it from a good copy. Hence "move any file at that path" and "never the database, even one you moved away". A recorded hash would close it in code (Backlog).
+
+The backup lister, the recovery hint and its by-hand steps are gone. The two banners say to read the log and delete nothing, and `STARTUP_OPEN_FAILED`'s points at the log.
+
+**Tests.**
+- Each message is pinned whole. "doing what the message says" (`database.integration.test.ts`) does by hand what one says and boots: the data is back, or the server stops. It also covers a damaged database whose backup is bad too (never blank, also when the move is repeated) and a backup from before the recorded migration. It doesn't read the text, and doesn't stage the `-journal`/`-wal` clause or the copy of the data folder.
+- The "could not be removed", newer-build and restore-failed tests boot again and require a table the backup lacks to be gone (`expectNextBootRestores`). Two earlier versions passed with no restore at all.
+- Other gaps closed:
+  - the outer catch's `existsSync` guard (an unreadable data dir claims no interrupted migration)
+  - the success path's `backupPath !== null` guard (a fresh install)
+  - closing the connection before the rename, on both restore paths (Linux, via `/proc/self/fd`)
+  - `-wal` checked before an inert journal is removed
+  - a temp-file cleanup failure is logged
+  - the failed-migration restore's `warn` line
+  - the kept-sentinel line after a failed restore, and its absence with no sentinel
+- **Closed by deletion:** `withPath`'s `code` and `cause`, which nothing read.
+
+**Mutations caught: 37 of 37** on this code, none by a timeout; an unchanged control passes.
+- Behaviour:
+  - the sentinel step restores nothing (17 tests, including the five that boot again)
+  - the sentinel ignored; the backup check skipped; the `lastApplied` row not checked; a newer build's backup accepted
+  - the sentinel deleted on an untouched path, by the startup catch, or after a failed sentinel restore; kept after a successful one
+  - the newer-database check after the sentinel step; the connection left open before a restore; the success path's `backupPath` guard
+  - `-wal` checked after the journal removal; an inert journal left in place; no `startedAt` check; temp cleanup skipped, or its failure not logged
+- Messages (each pinned whole; these were run): `KEEP_FILES` dropped at each of its four sites; the whole fix, and its newer-build, lock, "move any file", "never the database" and "even one you moved away" clauses; the startup line's restart; the three "could not be removed" endings; the startup and kept-sentinel lines not logged, or logged with no sentinel; the failed-migration restore's `warn`; `withPath` naming no file
+
+**Left for a person** (Backlog): a migration-in-progress file with damaged contents, and a bad backup with no good copy. The log says to keep every file.

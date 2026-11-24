@@ -165,29 +165,12 @@ async function closeAndRestore(backupPath: string, dbFile: string): Promise<void
   restoreBackup(backupPath, dbFile);
 }
 
-// The safe order for an operator, for a MIGRATION_INTERRUPTED detail: restore
-// first, then delete the sentinel.
-function recoveryHint(dbFile: string): string {
-  return (
-    `To recover, stop the server, copy a known-good backup (${backupCandidates(dbFile)}) over ` +
-    `${dbFile}, then delete ${migrationSentinelPath(dbFile)}; deleting only the sentinel lets ` +
-    'the next boot back up this possibly half-migrated file over the good backup'
-  );
-}
-
-function backupCandidates(dbFile: string): string {
-  const dir = path.dirname(dbFile);
-  const prefix = `${path.basename(dbFile)}.backup-`;
-  try {
-    const names = fs
-      .readdirSync(dir)
-      .filter((n) => n.startsWith(prefix))
-      .sort();
-    return names.length > 0 ? names.map((n) => path.join(dir, n)).join(', ') : 'none found';
-  } catch (err) {
-    return `none listed: ${(err as NodeJS.ErrnoException).code}`;
-  }
-}
+// Ends every message about a sentinel that still needs its restore. None of them
+// asks for a restore by hand, which can copy a bad backup, or leave a journal
+// SQLite replays onto it: that is left to the next boot's checked restore.
+const KEEP_FILES =
+  'Do not delete the migration-in-progress file, the database or any backup. (Paths are as ' +
+  'the server sees them: under Docker, look in the host folder mounted there.)';
 
 // After a failed restore: reopen the file, or, if that also fails, a bare
 // in-memory DB so the process still comes up and the read-only status endpoint
@@ -266,20 +249,32 @@ export async function initializeDatabase(
         systemStatus.enterReadOnly('MIGRATION_INTERRUPTED', detail);
         return conn.db;
       };
-      const untouched = (problem: string): Kysely<Database> =>
+      const untouched = (problem: string, fix: string): Kysely<Database> =>
         interrupted(
-          `a migration run did not finish (${sentinelFile}) and ${problem}; the database and ` +
-            `its backups are left untouched. ${recoveryHint(dbFile)}`,
+          `a migration run did not finish cleanly (${sentinelFile}) and ${problem}; nothing was ` +
+            `restored, backed up or migrated. ${fix}. ${KEEP_FILES}`,
         );
       if (sentinel === 'unreadable') {
-        return untouched('the sentinel is unreadable');
+        return untouched(
+          'that file is unreadable',
+          'If its permissions are the cause, fix them and restart: the next boot checks the ' +
+            'backup it names before restoring it. If its contents are damaged, stop the server ' +
+            'and copy the whole data folder somewhere safe before changing anything',
+        );
       }
       const problem = sentinelBackupProblem(
         sentinel,
         new Set(await getProviderMigrationNames(activeMigrationProvider)),
       );
       if (problem !== null) {
-        return untouched(problem);
+        return untouched(
+          problem,
+          'If permissions or a lock are the cause, fix that; if a newer build wrote it, run that ' +
+            'build; otherwise move any file at that path into a new folder and put a good copy of ' +
+            'the backup there, never the database, even one you moved away (it may be ' +
+            'half-migrated, and the check cannot tell). Then restart: the next boot tries the ' +
+            'restore again',
+        );
       }
       try {
         await closeAndRestore(sentinel.backupPath, dbFile);
@@ -287,9 +282,10 @@ export async function initializeDatabase(
         // Read-only first, then the reopen: its fallback logs on its own.
         systemStatus.enterReadOnly(
           'MIGRATION_INTERRUPTED',
-          `restoring ${sentinel.backupPath} after an interrupted migration failed (the ` +
-            'database is unchanged, or already the backup if only the directory fsync after ' +
-            `the rename failed), and ${sentinelFile} was kept: ${(err as Error).message}`,
+          `restoring ${sentinel.backupPath} after an interrupted migration failed: ` +
+            `${(err as Error).message}. The database is unchanged, or already the backup if only ` +
+            `the directory fsync after the rename failed, and ${sentinelFile} was kept. Fix the ` +
+            `cause and restart: the next boot retries the restore. ${KEEP_FILES}`,
         );
         conn = openConnectionOrMemory(dbFile);
         return conn.db;
@@ -305,7 +301,9 @@ export async function initializeDatabase(
         // a later boot, so don't take writes until it's gone.
         return interrupted(
           `restored ${sentinel.backupPath} after an interrupted migration, but ${sentinelFile} ` +
-            `could not be removed (or its removal made durable): ${(err as Error).message}`,
+            `could not be removed (or its removal made durable): ${(err as Error).message}; fix the ` +
+            'cause and restart (if it is still there, the next boot restores that backup again, so ' +
+            'keep it)',
         );
       }
     }
@@ -318,20 +316,16 @@ export async function initializeDatabase(
     // in-memory connection so the process still comes up and
     // /api/system/status is reachable.
     logger.error(`Could not open database at startup: ${(err as Error).message}`);
-    // A torn half-migrated file fails here, before the sentinel check, so say
-    // which backup the operator can restore. The existsSync isn't redundant:
-    // in a data dir this process can't read, readMigrationSentinel answers
+    // A torn half-migrated file fails here, before the sentinel check. existsSync
+    // rather than a read: in a data dir this process can't enter, a read answers
     // 'unreadable', which would claim an interrupted run that never happened.
-    const leftover = fs.existsSync(migrationSentinelPath(dbFile))
-      ? readMigrationSentinel(dbFile)
-      : null;
-    if (leftover !== null) {
+    const sentinelFile = migrationSentinelPath(dbFile);
+    if (fs.existsSync(sentinelFile)) {
       logger.error(
-        `A migration run did not finish (${migrationSentinelPath(dbFile)})` +
-          (leftover === 'unreadable'
-            ? `, and the sentinel is unreadable. ${recoveryHint(dbFile)}`
-            : `: with the server stopped, copy its backup ${leftover.backupPath} over ${dbFile}, ` +
-              `delete any ${dbFile}-journal beside it, then delete the sentinel`),
+        `A migration run did not finish cleanly (${sentinelFile}). Fix the startup error and ` +
+          'restart: the next boot tries the recovery again. If the database file itself is ' +
+          'damaged, first stop the server and move it, with any -journal or -wal beside it, ' +
+          `into a new folder, names unchanged. ${KEEP_FILES}`,
       );
     }
     systemStatus.enterReadOnly('STARTUP_OPEN_FAILED', err);
@@ -386,8 +380,8 @@ export async function initializeDatabase(
           'MIGRATION_INTERRUPTED',
           `the migration succeeded, but ${migrationSentinelPath(dbFile)} could not be removed ` +
             `(or its removal made durable): ${(err as Error).message}; fix the cause and ` +
-            `restart: if the sentinel is still there, the next boot restores ${backupPath} and ` +
-            'migrates again',
+            `restart: if it is still there, the next boot restores ${backupPath} and ` +
+            'migrates again, so keep that backup',
         );
         return conn.db;
       }
@@ -413,7 +407,8 @@ export async function initializeDatabase(
         // read-only blocks writes.
         logger.error(
           `Could not remove the migration sentinel ${migrationSentinelPath(dbFile)}: ` +
-            `${(removeErr as Error).message}; if it is still there, the next boot restores ${backupPath} again`,
+            `${(removeErr as Error).message}; if it is still there, the next boot restores ${backupPath} ` +
+            'again, so keep that backup',
         );
       }
       // Restore succeeded — DB is at a known-good prior version. Enter read-only
@@ -425,6 +420,13 @@ export async function initializeDatabase(
       return conn.db;
     } catch (restoreErr) {
       systemStatus.enterReadOnly('MIGRATION_FAILED_RESTORE_FAILED', restoreErr);
+      const sentinelFile = migrationSentinelPath(dbFile);
+      if (fs.existsSync(sentinelFile)) {
+        logger.error(
+          `${sentinelFile} was kept: fix the cause and restart, and the next boot retries the ` +
+            `restore of ${backupPath}. ${KEEP_FILES}`,
+        );
+      }
       // closeAndRestore() destroyed the handles: reopen, or fall back to memory.
       conn = openConnectionOrMemory(dbFile);
       return conn.db;
