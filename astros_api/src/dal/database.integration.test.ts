@@ -772,11 +772,13 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
     expect(entered).toHaveBeenCalledExactlyOnceWith(
       'MIGRATION_INTERRUPTED',
       `a migration run did not finish cleanly (${sentinel()}) and its backup ${dbPath}.backup-gone ` +
-        'is missing; nothing was restored, backed up or migrated. If permissions or a lock are the ' +
-        'cause, fix that; if a newer build wrote it, run that build; otherwise move any file at ' +
-        'that path into a new folder and put a good copy of the backup there, never the database, ' +
-        'even one you moved away (it may be half-migrated, and the check cannot tell). Then ' +
-        `restart: the next boot tries the restore again. ${KEEP_FILES}`,
+        'is missing; nothing was restored, backed up or migrated. If a program has the backup open, ' +
+        'close it; if permissions are the cause, fix them; if a newer build wrote it, run that ' +
+        'build. Otherwise move whatever is at its path, together with any -journal or -wal beside ' +
+        'it (never only one of them), into a new folder, and put a good copy at its path: never the ' +
+        'database, even one you moved away (it may be half-migrated, and the check cannot tell). If ' +
+        'the copy has a -journal or -wal of its own, first run any query on it with sqlite3, which ' +
+        `folds that in. Then restart: the next boot tries the restore again. ${KEEP_FILES}`,
     );
   });
 
@@ -1274,6 +1276,20 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
       __setMigrationProviderForTest(buildProvider(partialMigration({ value: false })));
     }
 
+    // The good copy as a main file holding `main`, and a -wal changing it to `wal`.
+    function writeWalPair(dest: string, main: string, wal: string): void {
+      const stage = path.join(tmpDir, 'elsewhere', 'stage.sqlite3');
+      fs.copyFileSync(goodCopy(), stage);
+      const db = new SQLite(stage);
+      db.pragma('journal_mode = WAL');
+      db.prepare('UPDATE kept SET id = ?').run(main);
+      db.pragma('wal_checkpoint(TRUNCATE)');
+      db.prepare('UPDATE kept SET id = ?').run(wal);
+      fs.copyFileSync(stage, dest);
+      fs.copyFileSync(`${stage}-wal`, `${dest}-wal`);
+      db.close();
+    }
+
     async function bootReason(): Promise<string | undefined> {
       const status = new SystemStatus();
       await initializeDatabase(status, { dbPath });
@@ -1289,9 +1305,11 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
       db.close();
     }
 
-    function moveToNewFolder(file: string): void {
+    function moveToNewFolder(...files: string[]): void {
       const folder = fs.mkdtempSync(path.join(tmpDir, 'damaged-'));
-      fs.renameSync(file, path.join(folder, path.basename(file)));
+      for (const file of files) {
+        fs.renameSync(file, path.join(folder, path.basename(file)));
+      }
     }
 
     it.each([
@@ -1305,6 +1323,29 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
         moveToNewFolder(backupPath());
       }
       fs.copyFileSync(goodCopy(), backupPath());
+      await expectRecovered();
+    });
+
+    it('a backup with changes in its -wal: move both, put a good copy and restart', async () => {
+      // Break: passing the merged view and restoring the main file alone, which
+      // loses those changes and removes the sentinel as if nothing were wrong.
+      await stageHalfMigrated((b) => writeWalPair(b, 'S1', 'only in the -wal'));
+      const before = { sha: sha256(dbPath), files: fs.readdirSync(tmpDir).sort() };
+      expect(await bootReason()).toBe('MIGRATION_INTERRUPTED');
+      expect(sha256(dbPath)).toBe(before.sha);
+      expect(fs.readdirSync(tmpDir).sort()).toEqual(before.files);
+      moveToNewFolder(backupPath(), `${backupPath()}-wal`);
+      fs.copyFileSync(goodCopy(), backupPath());
+      await expectRecovered();
+    });
+
+    it('a good copy with a -wal of its own: query it first, then restart', async () => {
+      // The query is what folds it in: opening and closing alone does not.
+      await stageHalfMigrated((b) => writeWalPair(b, 'stale', 'S1'));
+      expect(await bootReason()).toBe('MIGRATION_INTERRUPTED');
+      const db = new SQLite(backupPath());
+      db.prepare('SELECT count(*) FROM sqlite_master').get();
+      db.close();
       await expectRecovered();
     });
 

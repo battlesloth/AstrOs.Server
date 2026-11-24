@@ -870,9 +870,9 @@ describe('migration sentinel', () => {
   });
 });
 
-// T-016: the backup a sentinel names is restored only when it opens, passes
-// quick_check, records the sentinel's last applied migration, and holds no
-// migration this build doesn't know.
+// T-016: the backup a sentinel names is restored only when it has no pending
+// -wal or -journal, opens, passes quick_check, records the sentinel's last
+// applied migration, and holds no migration this build doesn't know.
 describe('sentinelBackupProblem', () => {
   const KNOWN: ReadonlySet<string> = new Set(['8_x', '9_x']);
   let dir: string;
@@ -926,6 +926,77 @@ describe('sentinelBackupProblem', () => {
     expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toMatch(
       /no record of migration 9_x/,
     );
+  });
+
+  it('rejects a backup whose changes are still in its -wal, touching nothing', () => {
+    // Break: checking the view SQLite merges from both files, when restoreBackup
+    // copies only the main one. Here the row the check needs is in the -wal.
+    writeBackup(['8_x']);
+    const stage = path.join(dir, 'stage');
+    fs.copyFileSync(backupPath, stage);
+    const db = new SQLite(stage);
+    db.pragma('journal_mode = WAL');
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    db.prepare("INSERT INTO kysely_migration VALUES ('9_x', '2026-11-22T00:00:00.000Z')").run();
+    // As a program killed on the copy leaves them: no close, so no checkpoint.
+    fs.copyFileSync(stage, backupPath);
+    fs.copyFileSync(`${stage}-wal`, `${backupPath}-wal`);
+    db.close();
+    fs.rmSync(stage);
+    const before = fs.readdirSync(dir);
+
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBe(
+      `its backup ${backupPath} can't be restored alone: ${fs.realpathSync(backupPath)}-wal may be part of it`,
+    );
+    expect(fs.readdirSync(dir)).toEqual(before);
+  });
+
+  it('rejects a backup with a hot -journal, touching nothing; an inert one is fine', () => {
+    // Break: leaving it to SQLite, whose "attempt to write a readonly database"
+    // sends the operator after permissions.
+    writeBackup(['8_x', '9_x']);
+    fs.writeFileSync(`${backupPath}-journal`, 'a hot journal');
+    const before = fs.readdirSync(dir);
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBe(
+      `its backup ${backupPath} can't be restored alone: ${fs.realpathSync(backupPath)}-journal may be part of it`,
+    );
+    expect(fs.readdirSync(dir)).toEqual(before);
+    for (const inert of [Buffer.alloc(0), Buffer.alloc(512)]) {
+      fs.writeFileSync(`${backupPath}-journal`, inert);
+      expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBeNull();
+    }
+  });
+
+  it.runIf(process.platform !== 'win32')(
+    'looks for the -wal or -journal beside the file a symlinked backup points at',
+    () => {
+      // Break: looking beside the link. SQLite resolves it first, so it reads the
+      // target's -wal and ignores one beside the link.
+      writeBackup(['8_x', '9_x']);
+      const target = path.join(dir, 'target.sqlite3');
+      fs.renameSync(backupPath, target);
+      fs.symlinkSync(target, backupPath);
+      fs.writeFileSync(`${backupPath}-wal`, 'ignored by SQLite');
+      expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBeNull();
+      for (const suffix of ['-wal', '-journal']) {
+        fs.writeFileSync(`${target}${suffix}`, 'read by SQLite');
+        expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBe(
+          `its backup ${backupPath} can't be restored alone: ${fs.realpathSync(target)}${suffix} may be part of it`,
+        );
+        fs.rmSync(`${target}${suffix}`);
+      }
+    },
+  );
+
+  it('accepts a WAL-mode backup again after its own check left an empty -wal', () => {
+    // Break: refusing any -wal, so a restore that failed once could never be retried.
+    writeBackup(['8_x', '9_x']);
+    const db = new SQLite(backupPath);
+    db.pragma('journal_mode = WAL');
+    db.close();
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBeNull();
+    expect(fs.statSync(`${backupPath}-wal`).size).toBe(0);
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBeNull();
   });
 
   it('rejects a backup with a damaged page, which the migration lookup alone accepts', () => {

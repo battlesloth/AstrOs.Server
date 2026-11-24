@@ -50,6 +50,7 @@ The reviewer reproduced it: a migration that creates a table and then throws, wi
   - `restoreBackup` throws before copying while a hot `<dbFile>-journal` (non-empty, non-zero first byte) or any `-wal` exists. A rename over a hot journal lets SQLite replay it onto the restored file.
   - It removes an inert journal (empty or zero first byte, SQLite's own "not hot" test) with a `warn` and continues, because no read ever clears one.
 - **An unreadable sentinel's detail names only the sentinel (Jeff, 2026-11-23;** amends "the detail names the sentinel and the backup path"). The backup's path is inside the file it can't read, and guessing one from the database could name the wrong backup. Every other `MIGRATION_INTERRUPTED` detail names both.
+- **Every commit is flushed (Jeff, 2026-11-23, PR #140 review).** `createKyselyConnection` sets `PRAGMA synchronous = FULL`. It is already the default in the rollback-journal mode this app uses, but not in WAL mode, which a restored or hand-edited database can be in. There a power cut could undo part of a migration run whose sentinel was already removed.
 - **Note:** the Vue mirror of `ReadOnlyReasonCode` is `astros_vue/src/types/systemStatus.ts`, which `models/websocket/systemStatusMessage.ts` imports. The Contract named the importer. The `systemStatus` store itself needed no change; only its spec's plain-code list did.
 
 ## Task
@@ -117,6 +118,7 @@ The reviewer reproduced it: a migration that creates a table and then throws, wi
 | unlink the sentinel | EACCES | after a sentinel restore or a successful migration: enter `MIGRATION_INTERRUPTED`, since a stale sentinel would restore over good data next boot. After a failed-migration restore: log `error` and keep `MIGRATION_FAILED_RESTORED`, because the next boot restores the same backup again, which is harmless while read-only blocks writes |
 | fsync the dir after the unlink | EIO | throw, handled as the unlink's EACCES |
 | the backup lacks a `kysely_migration` row for `lastApplied` (or is empty) | — | `MIGRATION_INTERRUPTED` (amendment) |
+| a non-empty `-wal` or a hot `-journal` beside the backup (for a symlink, beside its target) | — | `MIGRATION_INTERRUPTED`, touching nothing: SQLite would apply those to the backup, and `restoreBackup` copies only the main file (PR #140 review) |
 | the backup holds migrations this build doesn't know | — | `MIGRATION_INTERRUPTED`, touching nothing: the Contract's "fails the check" branch (re-review ruling) |
 | `restoreBackup` with a hot `<db>-journal` (non-zero first byte) or any `-wal` beside the DB | — | throws before copying (a rename would let SQLite replay the old file's hot journal onto the restored one); the restore-failed handling applies |
 
@@ -162,6 +164,7 @@ The reviewer reproduced it: a migration that creates a table and then throws, wi
 - [x] Pre-commit: api prettier + lint, build, vitest; vue format + lint, build, vitest; code review (two rounds)
 - [x] Manual verification (Verification section and QA cases 15–18, 2026-11-23, at `12ac0e35`: a worktree booting the real `ApiServer`, serial skipped, on a copy of the dev database `.data/database.sqlite3`, which was at 8; all green, `.dump` sha256 equal). The first run (2026-11-22) was at `6e910cd1`, before the pre-push fixes, and on a copy of `~/.config/astrosserver/database.sqlite3` (at 7), not the dev database.
 - [x] Manual verification of the follow-up (2026-11-23): QA cases 15, 16, 16a, 17 and 18 walked as rewritten, the same way, on the follow-up's `database.ts` and `backup.ts`. All pass; every recovery ends with a `.dump` sha256 equal to the good copy, and the dev database is unchanged. Not run: the Vue banner in a browser, Docker, a Pi.
+- [x] Manual verification of the PR #140 review fix (2026-11-23): the same cases, plus case 16 with a `-wal` left beside the backup by a killed program (refused untouched; moving both away and putting a good copy back recovers), on that fix's `database.ts` and `backup.ts`. All pass; the dev database is unchanged. Not run: the same three.
 - [x] Pre-push `/pr-review-toolkit:review-pr` (5 agents) and its fix pass (Pre-push review notes). Not rerun for the follow-up (Jeff, 2026-11-23).
 
 ## Review notes
@@ -308,19 +311,19 @@ Sources: the mutations the pushed commit hadn't run, a fresh-context review of i
 The first attempt rewrote those steps, and the second review found it still unsafe. It listed the rejected backup as a candidate to copy, offered old backups as known-good, told the operator to move the only copy when there was no backup, and prescribed by-hand work where a restart was enough.
 
 **The fix: none of T-016's messages asks for a restore by hand.** That is left to the server's own checked restore, on the next boot:
-- a bad backup: fix its permissions or lock, run the newer build that wrote it, or move it away and put a good copy at its path, never the database
+- a bad backup: close a program that has it open, fix its permissions, run the newer build that wrote it, or move it away with any `-journal` or `-wal` and put a good copy at its path, never the database
 - a damaged database: move it into a new folder
 - a failed restore or a startup error: fix the cause
 - an unreadable sentinel: fix its permissions; with damaged contents there is no automatic way out, so copy the data folder before changing anything
 - each of these ends with `KEEP_FILES`: delete nothing, and where the paths are under Docker
 - the three "could not be removed" messages say to keep the backup the next boot will restore
 
-The second round found the first version of that text still let an operator put the half-migrated database at the backup's path, over a damaged backup that could still be read: the check can't tell it from a good copy. Hence "move any file at that path" and "never the database, even one you moved away". A recorded hash would close it in code (Backlog).
+The second round found the first version of that text still let an operator put the half-migrated database at the backup's path, over a damaged backup that could still be read: the check can't tell it from a good copy. Hence "move any file at that path" (reworded in the PR #140 review) and "never the database, even one you moved away". A recorded hash would close it in code (Backlog).
 
 The backup lister, the recovery hint and its by-hand steps are gone. The two banners say to read the log and delete nothing, and `STARTUP_OPEN_FAILED`'s points at the log.
 
 **Tests.**
-- Each message is pinned whole. "doing what the message says" (`database.integration.test.ts`) does by hand what one says and boots: the data is back, or the server stops. It also covers a damaged database whose backup is bad too (never blank, also when the move is repeated) and a backup from before the recorded migration. It doesn't read the text, and doesn't stage the `-journal`/`-wal` clause or the copy of the data folder.
+- Each message is pinned whole. "doing what the message says" (`database.integration.test.ts`) does by hand what one says and boots: the data is back, or the server stops. It also covers a damaged database whose backup is bad too (never blank, also when the move is repeated) and a backup from before the recorded migration. It doesn't read the text, and doesn't stage the startup line's `-journal`/`-wal` clause or the copy of the data folder.
 - The "could not be removed", newer-build and restore-failed tests boot again and require a table the backup lacks to be gone (`expectNextBootRestores`). Two earlier versions passed with no restore at all.
 - Other gaps closed:
   - the outer catch's `existsSync` guard (an unreadable data dir claims no interrupted migration)
@@ -332,7 +335,7 @@ The backup lister, the recovery hint and its by-hand steps are gone. The two ban
   - the kept-sentinel line after a failed restore, and its absence with no sentinel
 - **Closed by deletion:** `withPath`'s `code` and `cause`, which nothing read.
 
-**Mutations caught: 37 of 37** on this code, none by a timeout; an unchanged control passes.
+**Mutations caught: 37 of 37** at `e3b37607`, none by a timeout; an unchanged control passes.
 - Behaviour:
   - the sentinel step restores nothing (17 tests, including the five that boot again)
   - the sentinel ignored; the backup check skipped; the `lastApplied` row not checked; a newer build's backup accepted
@@ -342,3 +345,26 @@ The backup lister, the recovery hint and its by-hand steps are gone. The two ban
 - Messages (each pinned whole; these were run): `KEEP_FILES` dropped at each of its four sites; the whole fix, and its newer-build, lock, "move any file", "never the database" and "even one you moved away" clauses; the startup line's restart; the three "could not be removed" endings; the startup and kept-sentinel lines not logged, or logged with no sentinel; the failed-migration restore's `warn`; `withPath` naming no file
 
 **Left for a person** (Backlog): a migration-in-progress file with damaged contents, and a bad backup with no good copy. The log says to keep every file.
+
+### PR #140 review (2026-11-23, Copilot, on `e3b37607`)
+
+1. **High, real: a backup with changes in its `-wal` passed the check, and the restore lost them.** Reproduced: with a row only in the `-wal`, the boot restored the older main file, removed the sentinel and came up writable. With the `lastApplied` row only in the `-wal`, the check passed a backup whose main file lacks it. The server's own backups of a rollback-mode database have no `-wal`. One appears when a program opens the backup in WAL mode, or with an operator's copy.
+   - `sentinelBackupProblem` refuses a non-empty `-wal` or a hot `-journal` before it opens the backup (`pendingSidecar`). Ruling: this is the Contract's "its backup … fails the check" branch, like the newer-build refusal.
+   - An empty `-wal` passes, because the check's own read-only open leaves one beside a WAL-mode backup. A new backup is never refused for a stale one: `createBackup` clears it (probed).
+   - The fix text says to close a program that has the backup open (probed: closing it merges the `-wal`, and the next boot restores), and to move a bad backup together with any `-journal` or `-wal`, never only one of them.
+   - For a good copy that has its own `-journal` or `-wal`, it says to run any query on it with sqlite3 first (probed with the CLI: a query folds either in; opening and closing alone does not).
+2. **Medium, not taken: mock the directory descriptors in two test helpers, because Windows can reject opening a directory.** Node opens directories on Windows: libuv 1.51's `fs__open` sets `FILE_FLAG_BACKUP_SEMANTICS` for that. Only the flush is expected to fail there, with the `EPERM` that `fsyncDirectory` skips, after the helper has recorded it. Read from libuv's source (by two readers), not run on Windows; CI and production are Linux.
+
+**Review of the fix (fresh-context reviewer, before the commit).** No Critical findings. Important, all fixed:
+- **A symlinked backup still had the bug:** SQLite resolves a symlink before it appends `-wal`, and the first version looked beside the link. It now looks beside the target.
+- **The text sent the operator to the `-wal`:** "move any file at that path" read as the `-wal`'s path. Moving only the `-wal` and restarting loses its changes, and can leave a mix. It now says to move both, "never only one of them".
+- **A WAL-mode backup leaves the database in WAL mode,** where SQLite's default doesn't flush each commit (measured: 2 flushes for 5 commits, against 7 with `FULL` and 20 in rollback mode either way). A simulated power cut after a migration brought back T-016's bug. Jeff chose `synchronous = FULL` (amendment). A trace of a real migration on a WAL-mode database shows the `-wal` flushed 5 times before the sentinel's unlink, against once without the setting.
+
+The second pass found no Critical or Important issues. Most of its Minors were then fixed and re-tested, not re-reviewed: a handle leaked when setting `synchronous` throws, the journal half of the symlink test, the wording for a copy with its own `-wal`, and loose claims here.
+
+Not changed: a program that commits to the backup between the check and the copy (milliseconds; reproduced only by injecting the write), a `-wal` refused although it holds nothing the restore would lose, and a symlinked backup whose message names the target's `-wal` without naming the target. Setting `synchronous` also reads the file at every open, so a file locked by another program just after a failed-migration restore now reports `MIGRATION_FAILED_RESTORE_FAILED` (the next boot restores again); that widens the Backlog item on that reopen.
+
+**Verified on this fix:** API 1330/1330 with prettier, lint and build clean (the Vue suites not rerun: nothing there changed); the by-hand cases above; and 13 of 13 mutations caught, none by a timeout, with an unchanged control passing:
+- the sidecar check dropped, or made after the open; the `-wal` or the hot `-journal` not checked; an empty `-wal` or an inert `-journal` refused; either one looked for beside a symlink
+- `synchronous` not set; the handle leaked when that throws
+- the message's "close it", "never only one of them" and copy's-own-`-wal` clauses dropped

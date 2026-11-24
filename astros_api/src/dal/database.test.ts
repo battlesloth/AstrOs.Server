@@ -1,8 +1,65 @@
 import { describe, expect, it } from 'vitest';
 import appdata from 'appdata-path';
 import SQLite from 'better-sqlite3';
-import { assertNoFkViolations, PRODUCTION_MIGRATIONS, resolveDatabaseDir } from './database.js';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import {
+  assertNoFkViolations,
+  createKyselyConnection,
+  PRODUCTION_MIGRATIONS,
+  resolveDatabaseDir,
+} from './database.js';
 import { compareMigrationNames } from './backup.js';
+
+describe('createKyselyConnection', () => {
+  it('flushes every commit, even on a WAL-mode database', async () => {
+    // Break: WAL mode's default (NORMAL) doesn't flush a commit, so a power cut
+    // can undo part of a migration run whose sentinel is already gone (T-016).
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'astros-sync-'));
+    const file = path.join(dir, 'database.sqlite3');
+    const setup = new SQLite(file);
+    setup.exec('CREATE TABLE t (id INTEGER)');
+    setup.pragma('journal_mode = WAL');
+    setup.close();
+
+    const { db, raw } = createKyselyConnection(file);
+    try {
+      raw.prepare('SELECT id FROM t').all(); // the WAL default applies at the first read
+      expect(raw.pragma('journal_mode', { simple: true })).toBe('wal');
+      expect(raw.pragma('synchronous', { simple: true })).toBe(2); // FULL
+    } finally {
+      await db.destroy();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// The open file descriptors that point at `file` (Linux only).
+function openOn(file: string): number {
+  return fs.readdirSync('/proc/self/fd').filter((fd) => {
+    try {
+      return fs.readlinkSync(`/proc/self/fd/${fd}`) === file;
+    } catch {
+      return false; // the fd readdir itself used is gone by now
+    }
+  }).length;
+}
+
+describe('createKyselyConnection on a file it cannot read', () => {
+  it.runIf(process.platform === 'linux')('throws without leaking the handle', () => {
+    // Break: setting synchronous reads the file, so it can throw after the open.
+    const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'astros-open-')));
+    const file = path.join(dir, 'database.sqlite3');
+    fs.writeFileSync(file, 'not a database at all '.repeat(200));
+    try {
+      expect(() => createKyselyConnection(file)).toThrow('file is not a database');
+      expect(openOn(file)).toBe(0);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('assertNoFkViolations', () => {
   it('returns silently when no violations exist', () => {

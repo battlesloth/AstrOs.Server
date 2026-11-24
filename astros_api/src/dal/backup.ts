@@ -173,7 +173,8 @@ export function pruneOldBackups(dbPath: string, keep = 5): void {
 // a refusal here means one survived that read. An inert journal (empty, or a
 // zero first byte: SQLite's own "not hot" test) is left by a power cut before
 // its first fsync and that read never clears it, so it is removed instead.
-// A -wal always stops it (this database never runs in WAL mode).
+// A -wal always stops it: closing a WAL-mode database's last connection removes
+// its -wal, so one still here may hold unmerged changes.
 export function restoreBackup(backupPath: string, dbPath: string): void {
   if (fs.existsSync(`${dbPath}-wal`)) {
     throw new Error(`not restoring over ${dbPath} while ${dbPath}-wal exists`);
@@ -352,26 +353,45 @@ export function removeMigrationSentinel(dbFile: string): void {
   fsyncDirectory(path.dirname(target));
 }
 
+// The -wal with content, or the hot -journal, that SQLite would apply to `file`,
+// so that a copy of the file alone isn't the same database; or null.
+function pendingSidecar(file: string): string | null {
+  // SQLite looks beside the file a symlink points at.
+  const real = fs.realpathSync(file);
+  const wal = `${real}-wal`;
+  if ((fs.statSync(wal, { throwIfNoEntry: false })?.size ?? 0) > 0) {
+    return wal;
+  }
+  const journal = `${real}-journal`;
+  return fs.existsSync(journal) && isHotJournal(journal) ? journal : null;
+}
+
 // Why the backup a sentinel names can't be restored, or null if it can. It
 // must exist, pass quick_check, and record the sentinel's last applied
 // migration: quick_check answers ok for an empty file, and
 // restoring one would look like a fresh install that migrates from scratch.
 // It must also hold no migration outside `known` (this build's), so a backup a
 // newer build wrote is refused before anything is restored (T-006).
-// Opened read-only: nothing is created beside a backup in the rollback-journal
-// mode this app uses.
+// Nor may it have a pending sidecar: restoreBackup copies only the main file,
+// while the checks read a -wal with it and refuse a hot -journal less clearly. An
+// empty -wal is fine: the read-only open here leaves that beside a WAL-mode backup.
 export function sentinelBackupProblem(
   sentinel: Pick<MigrationSentinel, 'backupPath' | 'lastApplied'>,
   known: ReadonlySet<string>,
 ): string | null {
   const { backupPath, lastApplied } = sentinel;
+  let sidecar: string | null;
   try {
     fs.statSync(backupPath);
+    sidecar = pendingSidecar(backupPath);
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     return code === 'ENOENT'
       ? `its backup ${backupPath} is missing`
       : `its backup ${backupPath} can't be accessed (${code})`;
+  }
+  if (sidecar !== null) {
+    return `its backup ${backupPath} can't be restored alone: ${sidecar} may be part of it`;
   }
   let backup: SQLite.Database;
   try {

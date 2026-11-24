@@ -97,11 +97,20 @@ interface OpenConnection {
 }
 
 // Build a properly-configured Kysely + raw SQLite handle pair. Single source
-// of truth for connection options (PRAGMA foreign_keys = ON) so tests and
-// prod can never diverge. Exported so test setups don't roll their own.
+// of truth for connection options so tests and prod can never diverge. Exported
+// so test setups don't roll their own. synchronous = FULL is already the default
+// in the rollback-journal mode this app uses, but not in WAL mode, which a
+// restored or hand-edited file can be in: there an unflushed commit can be lost
+// after the migration sentinel is gone (T-016).
 export function createKyselyConnection(dbPath = ':memory:'): OpenConnection {
   const raw = new SQLite(dbPath);
-  raw.pragma('foreign_keys = ON');
+  try {
+    raw.pragma('foreign_keys = ON');
+    raw.pragma('synchronous = FULL'); // reads the file, so this can throw
+  } catch (err) {
+    raw.close();
+    throw err;
+  }
   const db = new Kysely<Database>({ dialect: new SqliteDialect({ database: raw }) });
   return { db, raw };
 }
@@ -269,11 +278,13 @@ export async function initializeDatabase(
       if (problem !== null) {
         return untouched(
           problem,
-          'If permissions or a lock are the cause, fix that; if a newer build wrote it, run that ' +
-            'build; otherwise move any file at that path into a new folder and put a good copy of ' +
-            'the backup there, never the database, even one you moved away (it may be ' +
-            'half-migrated, and the check cannot tell). Then restart: the next boot tries the ' +
-            'restore again',
+          'If a program has the backup open, close it; if permissions are the cause, fix them; ' +
+            'if a newer build wrote it, run that build. Otherwise move whatever is at its path, ' +
+            'together with any -journal or -wal beside it (never only one of them), into a new ' +
+            'folder, and put a good copy at its path: never the database, even one you moved away ' +
+            '(it may be half-migrated, and the check cannot tell). If the copy has a -journal or ' +
+            '-wal of its own, first run any query on it with sqlite3, which folds that in. Then ' +
+            'restart: the next boot tries the restore again',
         );
       }
       try {
