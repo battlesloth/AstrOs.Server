@@ -41,6 +41,7 @@ describe('readOnlyInterceptor', () => {
     'MIGRATION_FAILED_NO_BACKUP',
     'MIGRATION_FAILED_RESTORED',
     'MIGRATION_FAILED_RESTORE_FAILED',
+    'MIGRATION_INTERRUPTED',
   ])('a read-only 503 with %s updates the store and toasts', async (code) => {
     const rejected = installAndCaptureRejected();
     const err = error503(code);

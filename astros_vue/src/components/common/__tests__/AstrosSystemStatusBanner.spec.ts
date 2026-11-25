@@ -69,6 +69,19 @@ describe('AstrosSystemStatusBanner', () => {
     expect(wrapper.text()).not.toContain('currently unavailable for writes');
   });
 
+  it('renders the interrupted-migration message for MIGRATION_INTERRUPTED, not the UNKNOWN fallback', async () => {
+    // T-016: a migration run didn't finish cleanly and the server stopped its
+    // automatic recovery; the operator needs to know recovery is manual.
+    const store = useSystemStatusStore();
+    store.setStatus({ readOnly: true, reasonCode: 'MIGRATION_INTERRUPTED' });
+
+    const wrapper = mountBanner();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toContain(enUS.systemStatus.reasonCode.MIGRATION_INTERRUPTED);
+    expect(wrapper.text()).not.toContain('currently unavailable for writes');
+  });
+
   it('has a localized message for every reason code', () => {
     // The annotation is the real check: a code without a locale key fails
     // vue-tsc (npm run build type-checks specs).

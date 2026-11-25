@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import SQLite from 'better-sqlite3';
 import { Migration, MigrationProvider } from 'kysely';
 import {
@@ -9,6 +9,7 @@ import {
   migration_4,
 } from './migrations/index.js';
 import fs from 'fs';
+import { logger as backupLogger } from '../logger.js';
 import os from 'os';
 import path from 'path';
 import { createKyselyConnection, migrateToLatest } from './database.js';
@@ -20,7 +21,15 @@ import {
   createBackup,
   pruneOldBackups,
   restoreBackup,
+  migrationSentinelPath,
+  writeMigrationSentinel,
+  readMigrationSentinel,
+  removeMigrationSentinel,
+  sentinelBackupProblem,
 } from './backup.js';
+
+// chmod only restricts a non-root POSIX process.
+const CHMOD_RESTRICTS = process.platform !== 'win32' && process.getuid?.() !== 0;
 
 async function expectedMigrationNames(): Promise<string[]> {
   return Object.keys(await provider.getMigrations()).sort(compareMigrationNames);
@@ -374,8 +383,319 @@ describe('backup module', () => {
       restoreBackup(backupPath, dbPath);
 
       expect(fs.readFileSync(dbPath, 'utf8')).toBe('good-data');
+      expect(fs.readdirSync(tmpDir).sort()).toEqual([
+        'database.sqlite3',
+        'database.sqlite3.backup-x',
+      ]);
+    });
+
+    it.each([
+      ['a hot -journal', '-journal'],
+      ['a -wal', '-wal'],
+    ])('refuses to rename over a database with %s beside it', (_label, suffix) => {
+      // Break: SQLite replaying the old file's hot journal onto the restored
+      // one, a silent mix of both that still passes quick_check.
+      const dbPath = path.join(tmpDir, 'database.sqlite3');
+      const backupPath = path.join(tmpDir, 'database.sqlite3.backup-x');
+      fs.writeFileSync(dbPath, 'half-migrated');
+      fs.writeFileSync(`${dbPath}${suffix}`, 'hot');
+      fs.writeFileSync(backupPath, 'good-data');
+      expect(() => restoreBackup(backupPath, dbPath)).toThrow(suffix);
+      expect(fs.readFileSync(dbPath, 'utf8')).toBe('half-migrated');
+      expect(fs.readdirSync(tmpDir).sort()).toEqual(
+        ['database.sqlite3', `database.sqlite3${suffix}`, 'database.sqlite3.backup-x'].sort(),
+      );
+    });
+
+    it.each([
+      ['empty', Buffer.alloc(0)],
+      ['zero-header', Buffer.alloc(512)],
+    ])('clears an inert (%s) -journal and restores', (_label, bytes) => {
+      // Break: refusing a journal SQLite itself ignores (left by a power cut
+      // before its first fsync), which no read clears, so every boot fails
+      // the restore and recovery never happens.
+      const dbPath = path.join(tmpDir, 'database.sqlite3');
+      const backupPath = path.join(tmpDir, 'database.sqlite3.backup-x');
+      fs.writeFileSync(dbPath, 'half-migrated');
+      fs.writeFileSync(`${dbPath}-journal`, bytes);
+      fs.writeFileSync(backupPath, 'good-data');
+      const warn = vi.spyOn(backupLogger, 'warn');
+      try {
+        restoreBackup(backupPath, dbPath);
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining(`Removing the inert journal ${dbPath}-journal`),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+      expect(fs.readFileSync(dbPath, 'utf8')).toBe('good-data');
+      expect(fs.readdirSync(tmpDir).sort()).toEqual([
+        'database.sqlite3',
+        'database.sqlite3.backup-x',
+      ]);
+    });
+
+    it('checks for a -wal before it touches an inert -journal', () => {
+      // Break: deleting the journal and then refusing anyway.
+      const dbPath = path.join(tmpDir, 'database.sqlite3');
+      const backupPath = path.join(tmpDir, 'database.sqlite3.backup-x');
+      fs.writeFileSync(dbPath, 'half-migrated');
+      fs.writeFileSync(`${dbPath}-journal`, '');
+      fs.writeFileSync(`${dbPath}-wal`, 'wal');
+      fs.writeFileSync(backupPath, 'good-data');
+      expect(() => restoreBackup(backupPath, dbPath)).toThrow('-wal');
+      expect(fs.existsSync(`${dbPath}-journal`)).toBe(true);
+    });
+
+    it('logs a temp copy it could not clean up', () => {
+      // Break: swallowing the cleanup error, so what was left behind goes unlogged.
+      const dbPath = path.join(tmpDir, 'database.sqlite3');
+      const backupPath = path.join(tmpDir, 'database.sqlite3.backup-x');
+      fs.writeFileSync(dbPath, 'half-migrated');
+      fs.writeFileSync(backupPath, 'good-data');
+      fs.mkdirSync(`${dbPath}.restore-tmp`);
+      const warn = vi.spyOn(backupLogger, 'warn');
+      try {
+        expect(() => restoreBackup(backupPath, dbPath)).toThrow();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining(`Could not remove ${dbPath}.restore-tmp`),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('overwrites a temp copy a crash left behind', () => {
+      const dbPath = path.join(tmpDir, 'database.sqlite3');
+      const backupPath = path.join(tmpDir, 'database.sqlite3.backup-x');
+      fs.writeFileSync(dbPath, 'half-migrated');
+      fs.writeFileSync(`${dbPath}.restore-tmp`, 'a much longer torn copy from an earlier crash');
+      fs.writeFileSync(backupPath, 'good-data');
+      restoreBackup(backupPath, dbPath);
+      expect(fs.readFileSync(dbPath, 'utf8')).toBe('good-data');
+      expect(fs.readdirSync(tmpDir).sort()).toEqual([
+        'database.sqlite3',
+        'database.sqlite3.backup-x',
+      ]);
+    });
+
+    it('leaves the database whole when the copy fails part-way', () => {
+      // Break: copying straight over the database, which a power cut or a
+      // full disk mid-copy leaves truncated, so the next boot can't read it
+      // and never reaches the migration sentinel.
+      const dbPath = path.join(tmpDir, 'database.sqlite3');
+      const backupPath = path.join(tmpDir, 'database.sqlite3.backup-x');
+      fs.writeFileSync(dbPath, 'half-migrated');
+      fs.writeFileSync(backupPath, 'good-data');
+      const spy = vi.spyOn(fs, 'copyFileSync').mockImplementation((_src, dest) => {
+        fs.writeFileSync(dest as string, 'go');
+        throw Object.assign(new Error('intentional ENOSPC'), { code: 'ENOSPC' });
+      });
+      try {
+        expect(() => restoreBackup(backupPath, dbPath)).toThrow('intentional ENOSPC');
+      } finally {
+        spy.mockRestore();
+      }
+      expect(fs.readFileSync(dbPath, 'utf8')).toBe('half-migrated');
+      expect(fs.readdirSync(tmpDir).sort()).toEqual([
+        'database.sqlite3',
+        'database.sqlite3.backup-x',
+      ]);
+    });
+
+    it('throws with the database already restored when only the directory fsync fails', () => {
+      // Pins the restore-failed detail's "or already the backup": the rename
+      // happened, so the sentinel is kept and the next boot restores again.
+      const dbPath = path.join(tmpDir, 'database.sqlite3');
+      const backupPath = path.join(tmpDir, 'database.sqlite3.backup-x');
+      fs.writeFileSync(dbPath, 'half-migrated');
+      fs.writeFileSync(backupPath, 'good-data');
+      const fail = failDirectoryFsync(tmpDir);
+      try {
+        expect(() => restoreBackup(backupPath, dbPath)).toThrow(`fsync ${tmpDir}`);
+      } finally {
+        fail.restore();
+      }
+      expect(fs.readFileSync(dbPath, 'utf8')).toBe('good-data');
+    });
+
+    it.runIf(CHMOD_RESTRICTS)('restores a backup without owner-write', () => {
+      // Break: fsyncing the temp copy (which keeps the backup's mode) through a
+      // write handle, which EACCES fails for a non-root process.
+      const dbPath = path.join(tmpDir, 'database.sqlite3');
+      const backupPath = path.join(tmpDir, 'database.sqlite3.backup-x');
+      fs.writeFileSync(dbPath, 'half-migrated');
+      fs.writeFileSync(backupPath, 'good-data');
+      fs.chmodSync(backupPath, 0o444);
+      restoreBackup(backupPath, dbPath);
+      expect(fs.readFileSync(dbPath, 'utf8')).toBe('good-data');
     });
   });
+});
+
+// Records fsync / rename / unlink in call order, by basename (the directory as
+// '<dir>'), passing every call through.
+function recordDurability(dir: string): { events: string[]; restore(): void } {
+  const fdPath = new Map<number, string>();
+  const events: string[] = [];
+  const name = (p: string) => (p === dir ? '<dir>' : path.basename(p));
+  const realOpen = fs.openSync;
+  const realFsync = fs.fsyncSync;
+  const realRename = fs.renameSync;
+  const realUnlink = fs.unlinkSync;
+  const spies = [
+    vi.spyOn(fs, 'openSync').mockImplementation(((p: string, ...rest: never[]) => {
+      const fd = (realOpen as (...a: unknown[]) => number)(p, ...rest);
+      fdPath.set(fd, String(p));
+      return fd;
+    }) as never),
+    vi.spyOn(fs, 'fsyncSync').mockImplementation((fd) => {
+      events.push(`fsync ${name(fdPath.get(fd as number) ?? '?')}`);
+      realFsync(fd);
+    }),
+    vi.spyOn(fs, 'renameSync').mockImplementation((a, b) => {
+      events.push(`rename ${name(String(a))} -> ${name(String(b))}`);
+      realRename(a, b);
+    }),
+    vi.spyOn(fs, 'unlinkSync').mockImplementation((p) => {
+      events.push(`unlink ${name(String(p))}`);
+      realUnlink(p);
+    }),
+  ];
+  return { events, restore: () => spies.forEach((s) => s.mockRestore()) };
+}
+
+// Fails fsync of `dir` only (EIO by default, or the given code at its open).
+function failDirectoryFsync(dir: string, openCode?: string): { restore(): void } {
+  const realOpen = fs.openSync;
+  const realFsync = fs.fsyncSync;
+  let dirFd = -1;
+  const spies = [
+    vi.spyOn(fs, 'openSync').mockImplementation(((p: string, ...rest: never[]) => {
+      if (p === dir && openCode) {
+        throw Object.assign(new Error(`intentional ${openCode}`), { code: openCode });
+      }
+      const fd = (realOpen as (...a: unknown[]) => number)(p, ...rest);
+      if (p === dir) {
+        dirFd = fd;
+      }
+      return fd;
+    }) as never),
+    vi.spyOn(fs, 'fsyncSync').mockImplementation((fd) => {
+      if (fd === dirFd) {
+        throw Object.assign(new Error('intentional EIO'), { code: 'EIO' });
+      }
+      realFsync(fd);
+    }),
+  ];
+  return { restore: () => spies.forEach((s) => s.mockRestore()) };
+}
+
+// T-016: every durable step fsyncs in order, so a power cut can't undo it.
+describe('durability order', () => {
+  let dir: string;
+  let dbFile: string;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'astros-durability-'));
+    dbFile = path.join(dir, 'database.sqlite3');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('restoreBackup fsyncs the temp copy, renames it, then fsyncs the directory', () => {
+    // Break: a rename a power cut undoes, or one that lands before the copy's
+    // data does, leaving a torn database.
+    fs.writeFileSync(dbFile, 'half');
+    fs.writeFileSync(`${dbFile}.backup-x`, 'good');
+    const rec = recordDurability(dir);
+    try {
+      restoreBackup(`${dbFile}.backup-x`, dbFile);
+    } finally {
+      rec.restore();
+    }
+    expect(rec.events).toEqual([
+      'fsync database.sqlite3.restore-tmp',
+      'rename database.sqlite3.restore-tmp -> database.sqlite3',
+      'fsync <dir>',
+    ]);
+  });
+
+  it('writeMigrationSentinel fsyncs the temp file, renames it, then fsyncs the directory', () => {
+    // Break: a sentinel a power cut loses, so the next boot backs up over the
+    // only good copy.
+    const rec = recordDurability(dir);
+    try {
+      writeMigrationSentinel(dbFile, { backupPath: 'b', lastApplied: 'l' });
+    } finally {
+      rec.restore();
+    }
+    expect(rec.events).toEqual([
+      'fsync database.sqlite3.migration-in-progress.tmp',
+      'rename database.sqlite3.migration-in-progress.tmp -> database.sqlite3.migration-in-progress',
+      'fsync <dir>',
+    ]);
+  });
+
+  it('removeMigrationSentinel unlinks, then fsyncs the directory', () => {
+    // Break: an unlink a power cut undoes, bringing the sentinel back to
+    // restore the pre-migration backup over everything written since.
+    writeMigrationSentinel(dbFile, { backupPath: 'b', lastApplied: 'l' });
+    const rec = recordDurability(dir);
+    try {
+      removeMigrationSentinel(dbFile);
+    } finally {
+      rec.restore();
+    }
+    expect(rec.events).toEqual(['unlink database.sqlite3.migration-in-progress', 'fsync <dir>']);
+  });
+
+  it('propagates a directory fsync EIO, naming the directory', () => {
+    // Break: swallowing every directory fsync error, so a removal that may not
+    // be durable lets the server come up writable.
+    writeMigrationSentinel(dbFile, { backupPath: 'b', lastApplied: 'l' });
+    const fail = failDirectoryFsync(dir);
+    try {
+      expect(() => removeMigrationSentinel(dbFile)).toThrow(`fsync ${dir} failed: intentional EIO`);
+    } finally {
+      fail.restore();
+    }
+  });
+
+  it('leaves a complete sentinel when only the directory fsync after its rename fails', () => {
+    // Pins writeMigrationSentinel's comment: the next boot restores it
+    // harmlessly (its backup is identical to the unmigrated database).
+    const fail = failDirectoryFsync(dir);
+    try {
+      expect(() => writeMigrationSentinel(dbFile, { backupPath: 'b', lastApplied: 'l' })).toThrow(
+        'intentional EIO',
+      );
+    } finally {
+      fail.restore();
+    }
+    expect(readMigrationSentinel(dbFile)).toMatchObject({ backupPath: 'b', lastApplied: 'l' });
+  });
+
+  it.each(['EPERM', 'EISDIR', 'EINVAL'])(
+    'skips a directory fsync the platform refuses (%s), with a log line',
+    (code) => {
+      // Break: failing the write on a filesystem that can't fsync a directory,
+      // or skipping with nothing visible off Windows.
+      const level = process.platform === 'win32' ? 'debug' : 'warn';
+      const log = vi.spyOn(backupLogger, level);
+      const fail = failDirectoryFsync(dir, code);
+      try {
+        writeMigrationSentinel(dbFile, { backupPath: 'b', lastApplied: 'l' });
+      } finally {
+        fail.restore();
+      }
+      expect(readMigrationSentinel(dbFile)).toMatchObject({ backupPath: 'b' });
+      expect(log).toHaveBeenCalledWith(expect.stringContaining(`fsync not supported for ${dir}`));
+    },
+  );
 });
 
 // Kysely runs migrations in plain .sort() order (Migrator#resolveMigrations
@@ -456,5 +776,280 @@ describe('compareMigrationNames', () => {
     expect(sorted(shuffled)).toEqual(want);
     // The upstream assumption this rests on: plain .sort() gives the same order.
     expect([...shuffled].sort()).toEqual(want);
+  });
+});
+
+// T-016: a migration-in-progress sentinel records the backup a migration run
+// started from, so a boot after an interrupted run restores it instead of
+// overwriting it.
+describe('migration sentinel', () => {
+  let dir: string;
+  let dbFile: string;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'astros-sentinel-'));
+    dbFile = path.join(dir, 'database.sqlite3');
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('is named after the database file', () => {
+    expect(migrationSentinelPath(dbFile)).toBe(`${dbFile}.migration-in-progress`);
+  });
+
+  it('round-trips the backup path and last applied migration, with a start time', () => {
+    // Break: a sentinel that loses the backup path can't drive a restore.
+    writeMigrationSentinel(dbFile, { backupPath: `${dbFile}.backup-9_x`, lastApplied: '9_x' });
+    const read = readMigrationSentinel(dbFile);
+    expect(read).toMatchObject({ backupPath: `${dbFile}.backup-9_x`, lastApplied: '9_x' });
+    expect(typeof (read as { startedAt: string }).startedAt).toBe('string');
+    expect(Number.isNaN(Date.parse((read as { startedAt: string }).startedAt))).toBe(false);
+  });
+
+  it('leaves no temp file behind after a successful write', () => {
+    // Break: leaving <sentinel>.tmp beside the database (e.g. copying it
+    // instead of renaming).
+    writeMigrationSentinel(dbFile, { backupPath: 'b', lastApplied: 'l' });
+    expect(fs.readdirSync(dir).sort()).toEqual(['database.sqlite3.migration-in-progress']);
+  });
+
+  it('removes the temp file when the write fails, naming the sentinel', () => {
+    // Break: the temp file left behind after a failed fsync, or an error that
+    // doesn't say which file.
+    const spy = vi.spyOn(fs, 'fsyncSync').mockImplementationOnce(() => {
+      throw Object.assign(new Error('intentional EIO'), { code: 'EIO' });
+    });
+    try {
+      expect(() => writeMigrationSentinel(dbFile, { backupPath: 'b', lastApplied: 'l' })).toThrow(
+        `writing migration sentinel ${migrationSentinelPath(dbFile)} failed: intentional EIO`,
+      );
+    } finally {
+      spy.mockRestore();
+    }
+    expect(fs.readdirSync(dir)).toEqual([]);
+  });
+
+  it('reads as null when there is none', () => {
+    expect(readMigrationSentinel(dbFile)).toBeNull();
+  });
+
+  it.each([
+    ['not JSON', '{'],
+    [
+      'missing backupPath',
+      JSON.stringify({ lastApplied: 'l', startedAt: '2026-11-22T00:00:00.000Z' }),
+    ],
+    [
+      'missing lastApplied',
+      JSON.stringify({ backupPath: 'b', startedAt: '2026-11-22T00:00:00.000Z' }),
+    ],
+    ['missing startedAt', JSON.stringify({ backupPath: 'b', lastApplied: 'l' })],
+    [
+      'a non-string field',
+      JSON.stringify({ backupPath: 1, lastApplied: 'l', startedAt: '2026-11-22T00:00:00.000Z' }),
+    ],
+  ])('reads as unreadable when it is %s', (_label, content) => {
+    // Break: a damaged sentinel treated as absent, so the next boot backs up
+    // over the only good copy.
+    fs.writeFileSync(migrationSentinelPath(dbFile), content);
+    expect(readMigrationSentinel(dbFile)).toBe('unreadable');
+  });
+
+  it('reads as unreadable when the path is a directory', () => {
+    fs.mkdirSync(migrationSentinelPath(dbFile));
+    expect(readMigrationSentinel(dbFile)).toBe('unreadable');
+  });
+
+  it('removes the sentinel, and ignores one that is already gone', () => {
+    writeMigrationSentinel(dbFile, { backupPath: 'b', lastApplied: 'l' });
+    removeMigrationSentinel(dbFile);
+    expect(fs.existsSync(migrationSentinelPath(dbFile))).toBe(false);
+    expect(() => removeMigrationSentinel(dbFile)).not.toThrow();
+  });
+});
+
+// T-016: the backup a sentinel names is restored only when it has no pending
+// -wal or -journal, opens, passes quick_check, records the sentinel's last
+// applied migration, and holds no migration this build doesn't know.
+describe('sentinelBackupProblem', () => {
+  const KNOWN: ReadonlySet<string> = new Set(['8_x', '9_x']);
+  let dir: string;
+  let backupPath: string;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'astros-sentinel-backup-'));
+    backupPath = path.join(dir, 'database.sqlite3.backup-9_x');
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  function writeBackup(applied: string[]): void {
+    const db = new SQLite(backupPath);
+    db.prepare('CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT)').run();
+    for (const name of applied) {
+      db.prepare('INSERT INTO kysely_migration VALUES (?, ?)').run(
+        name,
+        '2026-11-22T00:00:00.000Z',
+      );
+    }
+    db.close();
+  }
+
+  it('accepts a backup that records the last applied migration', () => {
+    writeBackup(['8_x', '9_x']);
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBeNull();
+  });
+
+  it('rejects a missing backup', () => {
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBe(
+      `its backup ${backupPath} is missing`,
+    );
+  });
+
+  it('rejects a backup that is not a database', () => {
+    // Break: checking existence only, so garbage is restored over the database.
+    fs.writeFileSync(backupPath, 'not a database at all, just bytes '.repeat(200));
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toMatch(
+      /can't be read|can't be opened|quick_check/,
+    );
+    expect(fs.readdirSync(dir)).toEqual(['database.sqlite3.backup-9_x']);
+  });
+
+  it('rejects an empty backup, which quick_check alone accepts', () => {
+    // Break: an empty file restored looks like a fresh install, so the server
+    // migrates from scratch and comes up empty with no banner.
+    fs.writeFileSync(backupPath, '');
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toMatch(
+      /no record of migration 9_x/,
+    );
+  });
+
+  it('rejects a backup whose changes are still in its -wal, touching nothing', () => {
+    // Break: checking the view SQLite merges from both files, when restoreBackup
+    // copies only the main one. Here the row the check needs is in the -wal.
+    writeBackup(['8_x']);
+    const stage = path.join(dir, 'stage');
+    fs.copyFileSync(backupPath, stage);
+    const db = new SQLite(stage);
+    db.pragma('journal_mode = WAL');
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    db.prepare("INSERT INTO kysely_migration VALUES ('9_x', '2026-11-22T00:00:00.000Z')").run();
+    // As a program killed on the copy leaves them: no close, so no checkpoint.
+    fs.copyFileSync(stage, backupPath);
+    fs.copyFileSync(`${stage}-wal`, `${backupPath}-wal`);
+    db.close();
+    fs.rmSync(stage);
+    const before = fs.readdirSync(dir);
+
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBe(
+      `its backup ${backupPath} can't be restored alone: ${fs.realpathSync(backupPath)}-wal may be part of it`,
+    );
+    expect(fs.readdirSync(dir)).toEqual(before);
+  });
+
+  it('rejects a backup with a hot -journal, touching nothing; an inert one is fine', () => {
+    // Break: leaving it to SQLite, whose "attempt to write a readonly database"
+    // sends the operator after permissions.
+    writeBackup(['8_x', '9_x']);
+    fs.writeFileSync(`${backupPath}-journal`, 'a hot journal');
+    const before = fs.readdirSync(dir);
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBe(
+      `its backup ${backupPath} can't be restored alone: ${fs.realpathSync(backupPath)}-journal may be part of it`,
+    );
+    expect(fs.readdirSync(dir)).toEqual(before);
+    for (const inert of [Buffer.alloc(0), Buffer.alloc(512)]) {
+      fs.writeFileSync(`${backupPath}-journal`, inert);
+      expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBeNull();
+    }
+  });
+
+  it.runIf(process.platform !== 'win32')(
+    'looks for the -wal or -journal beside the file a symlinked backup points at',
+    () => {
+      // Break: looking beside the link. SQLite resolves it first, so it reads the
+      // target's -wal and ignores one beside the link.
+      writeBackup(['8_x', '9_x']);
+      const target = path.join(dir, 'target.sqlite3');
+      fs.renameSync(backupPath, target);
+      fs.symlinkSync(target, backupPath);
+      fs.writeFileSync(`${backupPath}-wal`, 'ignored by SQLite');
+      expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBeNull();
+      for (const suffix of ['-wal', '-journal']) {
+        fs.writeFileSync(`${target}${suffix}`, 'read by SQLite');
+        expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBe(
+          `its backup ${backupPath} can't be restored alone: ${fs.realpathSync(target)}${suffix} may be part of it`,
+        );
+        fs.rmSync(`${target}${suffix}`);
+      }
+    },
+  );
+
+  it('accepts a WAL-mode backup again after its own check left an empty -wal', () => {
+    // Break: refusing any -wal, so a restore that failed once could never be retried.
+    writeBackup(['8_x', '9_x']);
+    const db = new SQLite(backupPath);
+    db.pragma('journal_mode = WAL');
+    db.close();
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBeNull();
+    expect(fs.statSync(`${backupPath}-wal`).size).toBe(0);
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toBeNull();
+  });
+
+  it('rejects a backup with a damaged page, which the migration lookup alone accepts', () => {
+    // Break: dropping quick_check. The kysely_migration row still reads, but
+    // restoring this would serve a database with corrupt table data.
+    writeBackup(['9_x']);
+    const db = new SQLite(backupPath);
+    db.prepare('CREATE TABLE filler (id INTEGER PRIMARY KEY, body TEXT)').run();
+    const insert = db.prepare('INSERT INTO filler (body) VALUES (?)');
+    db.transaction(() => {
+      for (let i = 0; i < 400; i++) {
+        insert.run('x'.repeat(200));
+      }
+    })();
+    const pageSize = db.pragma('page_size', { simple: true }) as number;
+    const pages = db.pragma('page_count', { simple: true }) as number;
+    db.close();
+    const fd = fs.openSync(backupPath, 'r+');
+    fs.writeSync(fd, Buffer.alloc(64, 0xff), 0, 64, (pages - 1) * pageSize + 8);
+    fs.closeSync(fd);
+
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toMatch(
+      /fails quick_check/,
+    );
+  });
+
+  it('rejects a backup a newer build wrote, before anything is restored', () => {
+    // Break: restoring it. Nothing re-checks after a restore, so this build
+    // would back up and serve a newer database.
+    writeBackup(['8_x', '9_x', 'm099_future']);
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toMatch(
+      /written by a newer build \(migrations this build does not know: m099_future\)/,
+    );
+  });
+
+  it.runIf(CHMOD_RESTRICTS)('reports a backup it cannot access as such, not as missing', () => {
+    // Break: existsSync reading EACCES as absent, which sends the operator
+    // looking for a file that is there.
+    writeBackup(['9_x']);
+    fs.chmodSync(dir, 0o000);
+    try {
+      expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toMatch(
+        /can't be accessed \(EACCES\)/,
+      );
+    } finally {
+      fs.chmodSync(dir, 0o700);
+    }
+  });
+
+  it('rejects a backup without the last applied migration', () => {
+    writeBackup(['8_x']);
+    expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toMatch(
+      /no record of migration 9_x/,
+    );
   });
 });

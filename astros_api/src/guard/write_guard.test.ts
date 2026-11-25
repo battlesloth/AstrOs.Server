@@ -202,6 +202,7 @@ describe('writeGuard', () => {
     'MIGRATION_FAILED_NO_BACKUP',
     'MIGRATION_FAILED_RESTORED',
     'MIGRATION_FAILED_RESTORE_FAILED',
+    'MIGRATION_INTERRUPTED',
   ] as const)('%s keeps plain read-only behavior: GET /scripts and POST /login pass', (code) => {
     const status = new SystemStatus();
     status.enterReadOnly(code);
