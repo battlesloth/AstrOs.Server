@@ -102,4 +102,11 @@
 
 ## Implementation checklist
 
-<!-- Added when work starts. -->
+- [ ] RED → GREEN: `migrationOrderProblem` in `dal/backup.ts` (`backup.test.ts`): exact prefix in any order, empty, unknown name, a gap in the legacy names, a test-range name above a pending lower one
+- [ ] RED → GREEN: `database.integration.test.ts`: clock ran behind (`9_` earlier than `8_`) and clock was ahead (`8_` at 2099), each with a pending test-range migration → migrated, not read-only, backup taken, sentinel removed; an applied test-range migration above a pending lower one → `MIGRATION_FAILED_RESTORED` with the message, database restored
+- [ ] `migrateToLatest`: read the applied names, run the check, throw on a problem; `allowUnorderedMigrations: true`. Mutations: each of the two halves dropped
+- [ ] Comments: above `PRODUCTION_MIGRATIONS` and `compareMigrationNames`, and T-012's shared-timestamp integration test
+- [ ] QA `system-readonly-mode.md` case; PLAN.md Backlog item struck
+- [ ] Pre-commit: api prettier + lint, build, vitest; smoke typecheck; code review
+- [ ] Verification by hand (Verification section)
+- [ ] Pre-push `/pr-review-toolkit:review-pr`; PLAN.md close-out at merge
