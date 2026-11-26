@@ -1,6 +1,6 @@
 # T-012: Name migrations from 10 on so they sort after `9_`
 
-<!-- File: .docs/tasks/T-012-migration-naming.md. Branch: feature/T-012-migration-naming. PR title: "T-012: Name migrations from 10 on so they sort after 9_". -->
+<!-- File: .docs/tasks/completed/T-012-migration-naming.md. Branch: feature/T-012-migration-naming. PR title: "T-012: Name migrations from 10 on so they sort after 9_". -->
 
 ## Context
 

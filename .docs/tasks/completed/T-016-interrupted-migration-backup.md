@@ -1,6 +1,6 @@
 # T-016: Keep the pre-migration backup when a migration is interrupted
 
-<!-- File: .docs/tasks/T-016-interrupted-migration-backup.md. Branch: feature/T-016-interrupted-migration-backup. PR title: "T-016: Keep the pre-migration backup when a migration is interrupted". -->
+<!-- File: .docs/tasks/completed/T-016-interrupted-migration-backup.md. Branch: feature/T-016-interrupted-migration-backup. PR title: "T-016: Keep the pre-migration backup when a migration is interrupted". -->
 
 ## Context
 
@@ -65,19 +65,19 @@ The reviewer reproduced it: a migration that creates a table and then throws, wi
 
 ## Acceptance criteria
 
-- [ ] **The reviewer's reproduction:**
+- [x] **The reviewer's reproduction:**
   - boot 1: migration fails and restore fails → `MIGRATION_FAILED_RESTORE_FAILED`, and the sentinel remains
   - boot 2 with a working restore → the good backup is restored first, the migration retries, and the backup on disk still has no partial table
   - Mutation: drop the sentinel check and see it fail.
-- [ ] **A successful migration leaves no sentinel. A failed migration whose restore succeeds leaves none either.**
-- [ ] **A sentinel whose backup is missing** → `MIGRATION_INTERRUPTED`; the database file's sha256 and the backup directory's listing are unchanged.
-- [ ] **A corrupt sentinel** (`{`) → `MIGRATION_INTERRUPTED`, with nothing touched.
-- [ ] **A sentinel left after a migration that succeeded but crashed before cleanup:**
+- [x] **A successful migration leaves no sentinel. A failed migration whose restore succeeds leaves none either.**
+- [x] **A sentinel whose backup is missing** → `MIGRATION_INTERRUPTED`; the database file's sha256 and the backup directory's listing are unchanged.
+- [x] **A corrupt sentinel** (`{`) → `MIGRATION_INTERRUPTED`, with nothing touched.
+- [x] **A sentinel left after a migration that succeeded but crashed before cleanup:**
   - next boot: restore, then re-migrate to the same end state
   - simulated by writing the sentinel by hand after a good migrate
-- [ ] **`writeMigrationSentinel` leaves no `.tmp` behind on success.** A failed write throws before `migrateToLatest` runs, entering `BACKUP_FAILED`, since without a sentinel the backup isn't protected.
-- [ ] **The Vue banner** shows the new code's message (store and banner specs).
-- [ ] **The QA plan** is updated.
+- [x] **`writeMigrationSentinel` leaves no `.tmp` behind on success.** A failed write throws before `migrateToLatest` runs, entering `BACKUP_FAILED`, since without a sentinel the backup isn't protected.
+- [x] **The Vue banner** shows the new code's message (store and banner specs).
+- [x] **The QA plan** is updated.
 
 ## Out of scope
 
@@ -160,7 +160,7 @@ The reviewer reproduced it: a migration that creates a table and then throws, wi
 - [x] `MIGRATION_INTERRUPTED` in `ReadOnlyReasonCode` (API), the Vue mirror and store, the `enUS.json` banner message, store/banner specs
 - [x] Pre-commit review fix pass (Review notes): atomic `restoreBackup`, `sentinelBackupProblem` with the `lastApplied` row, removal fsync, per-site details, the newer-backup refusal (the first pass's post-restore check, replaced in the re-review), coverage tests; the mutations caught are the ones listed in Review notes
 - [x] QA `system-readonly-mode.md` cases 15–18 and the trigger / Storybook lists
-- [ ] PLAN.md
+- [x] PLAN.md (close-out 2026-11-26)
 - [x] Pre-commit: api prettier + lint, build, vitest; vue format + lint, build, vitest; code review (two rounds)
 - [x] Manual verification (Verification section and QA cases 15–18, 2026-11-23, at `12ac0e35`: a worktree booting the real `ApiServer`, serial skipped, on a copy of the dev database `.data/database.sqlite3`, which was at 8; all green, `.dump` sha256 equal). The first run (2026-11-22) was at `6e910cd1`, before the pre-push fixes, and on a copy of `~/.config/astrosserver/database.sqlite3` (at 7), not the dev database.
 - [x] Manual verification of the follow-up (2026-11-23): QA cases 15, 16, 16a, 17 and 18 walked as rewritten, the same way, on the follow-up's `database.ts` and `backup.ts`. All pass; every recovery ends with a `.dump` sha256 equal to the good copy, and the dev database is unchanged. Not run: the Vue banner in a browser, Docker, a Pi.
