@@ -19,14 +19,17 @@ here).
   cp .data/database.sqlite3 /tmp/astros-release-qa/
   DB=/tmp/astros-release-qa/database.sqlite3
   ```
-- Start the API with `DATABASE_PATH=/tmp/astros-release-qa` and the Vue dev
-  server; log in; open the Modules page with the browser console and the API
-  log visible.
-- **Values set by SQL must stay in range.** Until T-015 adds the field, a bench
-  sets `release_ms` by SQL. A stored value outside 1000–120000 makes every
-  Modules page save answer 400 ("Request failed with status code 400"), since
-  the page sends it back. Check that this returns nothing:
-  `sqlite3 $DB "SELECT id, release_ms FROM maestro_channels WHERE release_ms NOT BETWEEN 1000 AND 120000"`.
+- Start the API on the copy, `cd astros_api && npm run build && DATABASE_PATH=/tmp/astros-release-qa npm run start`
+  (the environment variable wins over `DATABASE_PATH` in `dist/.env`), and the
+  Vue dev server (`cd astros_vue && npm run dev`); log in; open the Modules page
+  with the browser console and the API log visible. The API log is JSON lines
+  from pino: a `warn` is `"level":40`, and the text is in `"msg"`.
+- **Values set by SQL must be whole numbers in range.** Until T-015 adds the
+  field, a bench sets `release_ms` by SQL. A stored value outside 1000–120000,
+  or not a whole number (SQLite keeps `1500.5` as REAL), makes every Modules
+  page save answer 400 ("Request failed with status code 400"), since the page
+  sends it back. Check that this returns nothing:
+  `sqlite3 $DB "SELECT id, release_ms FROM maestro_channels WHERE typeof(release_ms) <> 'integer' OR release_ms NOT BETWEEN 1000 AND 120000"`.
 
 The console steps use this setup (paste it first). `channels(c)` is the first
 board of the first Maestro module in the body location; change `bodyModule` if
@@ -71,26 +74,31 @@ const channels = (c) => c.bodyModule.uartModules.find((m) => m.moduleSubType ===
    `channels(await load())[0].id` gives the channel's id. Run
    `sqlite3 $DB "UPDATE maestro_channels SET release_ms = 15000 WHERE id = '<id>'"`
    and reload the page. On that module's Channel 0, set the type to Servo if it
-   is disabled (its settings are hidden until then), change its name and home
-   position, and click **Save**. Expected:
+   isn't already (the position settings are hidden otherwise), change its name
+   and home position, and click **Save**. Expected:
    `sqlite3 $DB "SELECT name, home_pos, release_ms FROM maestro_channels WHERE id = '<id>'"`
    shows the new name and home position with `15000`.
 7. **A tab from before the field existed.** In the console:
    `const c = await load(); channels(c).forEach((ch) => delete ch.releaseMs); await save(c);`.
    Expected: `200 { message: 'success' }`; `channels(await load()).map((ch) => ch.releaseMs)`
    is all 5000, Channel 0 included (a save without the field stores the
-   default).
+   default); the API log has a warn entry whose `msg` reads
+   `UartRepository.upsertMaestroModule: board 0 (<board id>): <n> channel(s) saved without releaseMs; storing 5000`.
 8. **Valid bounds.** `const c = await load(); channels(c)[0].releaseMs = 1000; channels(c)[1].releaseMs = 120000; await save(c);`.
    Expected: `200`; channels 0 and 1 read 1000 and 120000.
 
 ## Negative / edge
 
-9. **A bad value refuses the whole save.** Note the locations' fingerprints:
-   `sqlite3 $DB "SELECT name, config_fingerprint FROM locations"`. Then
+9. **A bad value refuses the whole save.** Mark every location, since any
+   location write sets its fingerprint to `outofdate` (and the saves above
+   already have): `sqlite3 $DB "UPDATE locations SET config_fingerprint = 'qa-marker'"`.
+   Then
    `const c = await load(); channels(c)[0].releaseMs = 20000; channels(c)[1].releaseMs = 999; await save(c);`.
    Expected: `400 { message: 'invalid_release_ms', problems: ['body, module "<name>", board 0, channel 1: releaseMs 999 is not a whole number from 1000 to 120000'] }`;
-   the API log has a `warn` line starting `saveLocations: refused:`; channel 0
-   is not 20000, and the fingerprints are unchanged (no location was written).
+   the API log has a warn entry whose `msg` starts `saveLocations: refused:`;
+   channel 0 is not 20000, and every row of
+   `sqlite3 $DB "SELECT name, config_fingerprint FROM locations"` still reads
+   `qa-marker` (no location was written).
 10. **Each refused form.** Repeat case 9 with `120001`, `1500.5`, `'5000'`
     (a string) and `null` on channel 1. Expected: a `400` each time, naming the
     value (`"5000"` in quotes for the string).
@@ -98,11 +106,15 @@ const channels = (c) => c.bodyModule.uartModules.find((m) => m.moduleSubType ===
     **Sync**. Expected: the success toast, and the controller's Maestro servos
     still respond to the servo test. The config string keeps 7 fields per
     Maestro channel (pinned by `message_generator.test.ts`).
-12. **An older build refuses the migrated database.** Stop the API. In a
-    separate worktree, build develop from before T-013 merged (e.g.
-    `git worktree add /tmp/astros-pre-t013 34e575ba`, then `npm ci && npm run build`
-    in its `astros_api`), and start it with `DATABASE_PATH=/tmp/astros-release-qa`.
-    Expected: the log has `database has migrations this build does not know: m010_add_maestro_release_ms`,
-    the Vue app shows the "database version is newer than this server
-    supports" notice, and `$DB` is unchanged (no backup, no migration). Stop
-    it, remove the worktree, and restart the current build.
+12. **An older build refuses the migrated database.** Stop the API and run
+    `sha256sum $DB > /tmp/astros-release-qa.sha256` and `ls /tmp/astros-release-qa`. In a separate worktree,
+    build develop from before T-013 merged: `git worktree add /tmp/astros-pre-t013 34e575ba`,
+    copy `astros_api/.env` into `/tmp/astros-pre-t013/astros_api/` (it is
+    gitignored, and the build copies it into `dist/`), then
+    `cd /tmp/astros-pre-t013/astros_api && npm ci && npm run build && DATABASE_PATH=/tmp/astros-release-qa npm run start`.
+    Expected: the log has `database has migrations this build does not know: m010_add_maestro_release_ms`;
+    the open Modules tab shows the "database version is newer than this server
+    supports" notice; after stopping it, `sha256sum -c /tmp/astros-release-qa.sha256`
+    passes and `ls /tmp/astros-release-qa` lists the same files as before. Remove the
+    worktree (`git worktree remove /tmp/astros-pre-t013`) and restart the
+    current build.

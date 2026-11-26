@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Kysely, Migration, MigrationProvider, Migrator } from 'kysely';
 import { Database } from '../types.js';
 import { createKyselyConnection, migrateToLatest } from '../database.js';
@@ -15,6 +15,7 @@ import {
   migration_9,
   migration_m010,
 } from './index.js';
+import { logger } from 'src/logger.js';
 
 const v9Migrations: Record<string, Migration> = {
   '0_initial': migration_0,
@@ -59,6 +60,7 @@ describe('m010_add_maestro_release_ms: add maestro_channels.release_ms', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await db.destroy();
   });
 
@@ -126,8 +128,11 @@ describe('m010_add_maestro_release_ms: add maestro_channels.release_ms', () => {
   it('adds release_ms as INTEGER NOT NULL DEFAULT 5000', async () => {
     await migrateWith(v9Provider);
     expect(releaseMsColumn()).toBeUndefined();
+    const warnSpy = vi.spyOn(logger, 'warn');
 
     await migrateWith(m010Provider);
+
+    expect(warnSpy).not.toHaveBeenCalled();
 
     expect(releaseMsColumn()).toMatchObject({ type: 'INTEGER', notnull: 1, dflt_value: '5000' });
   });
@@ -167,16 +172,22 @@ describe('m010_add_maestro_release_ms: add maestro_channels.release_ms', () => {
 
   // Kysely runs SQLite migrations without a transaction, so a crash can land
   // between the ALTER and the migration record. An upgrade's next boot
-  // restores the backup first (T-016), but a fresh install has none, so its
-  // next boot runs up again on a table that already has the column.
+  // restores the backup first (T-016), but a fresh install's first boot takes
+  // none, so its next boot runs up again on a table that already has the
+  // column.
   it('up is a no-op when release_ms already exists but the migration is unrecorded', async () => {
     await migrateWith(v9Provider);
     seedBoard();
     insertV9Channel('ch-crash', 1);
     raw.exec('ALTER TABLE maestro_channels ADD COLUMN release_ms integer not null default 5000');
     raw.prepare("UPDATE maestro_channels SET release_ms = 7000 WHERE id = 'ch-crash'").run();
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
 
     await migrateWith(m010Provider);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      'm010_add_maestro_release_ms: maestro_channels.release_ms already exists; skipping the ALTER',
+    );
 
     expect(
       raw.prepare('SELECT release_ms FROM maestro_channels WHERE id = ?').get('ch-crash'),

@@ -17,7 +17,7 @@ describe('useModuleManagement', () => {
   });
 
   // The firmware's release floor before per-channel release times; a new
-  // channel must keep it until someone edits the channel.
+  // channel must start at it.
   it('gives every channel of a new Maestro module a 5000 ms release time', () => {
     useModuleManagement().addModule(Location.DOME, ModuleType.UART, ModuleSubType.MAESTRO);
 

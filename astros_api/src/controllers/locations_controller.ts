@@ -61,17 +61,17 @@ export async function saveLocations(db: Kysely<Database>, req: any, res: any, ne
   try {
     const repo = new LocationsRepository(db);
 
-    const modules = req.body as LocationCollection;
-
     // Before any write: each location below is saved in its own transaction,
     // so a refusal after the first would leave a partial save.
-    const problems = findInvalidReleaseMs(modules);
+    const problems = findInvalidReleaseMs(req.body);
     if (problems.length > 0) {
       logger.warn(`saveLocations: refused: ${problems.join('; ')}`);
       res.status(400);
       res.json({ message: 'invalid_release_ms', problems });
       return;
     }
+
+    const modules = req.body as LocationCollection;
 
     let success = true;
 

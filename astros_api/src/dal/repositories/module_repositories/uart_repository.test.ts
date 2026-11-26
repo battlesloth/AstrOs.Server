@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Kysely } from 'kysely';
 import { Database } from '../../types.js';
 import { createKyselyConnection, migrateToLatest } from '../../database.js';
@@ -13,6 +13,7 @@ import {
 import type { KangarooX2, MaestroModule, MaestroBoard } from '../../../models/index.js';
 import { getUartModules, readMaestroChannel, upsertUartModules } from './uart_repository.js';
 import { v4 as uuid } from 'uuid';
+import { logger } from 'src/logger.js';
 
 describe('UartRepository', () => {
   let db: Kysely<Database>;
@@ -25,6 +26,7 @@ describe('UartRepository', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await db.destroy();
   });
 
@@ -332,7 +334,8 @@ describe('UartRepository', () => {
     });
 
     // One Maestro module with one board; each entry is a channel's releaseMs,
-    // or undefined for a channel saved without the field (a stale browser tab).
+    // undefined for a channel saved without the field (a stale browser tab),
+    // or null.
     function maestroWith(modId: string, releaseMs: (number | undefined | null)[]): UartModule {
       const module = new UartModule(
         0,
@@ -408,6 +411,79 @@ describe('UartRepository', () => {
       await save(maestroWith('m1', [20000, undefined]));
 
       expect(await loadedReleaseMs()).toEqual([20000, 5000]);
+    });
+
+    // A save without the field resets a custom value to the default, which a
+    // client that drops the field by mistake would do silently.
+    it('warns once per board when channels arrive without releaseMs', async () => {
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+      await save(maestroWith('m1', [undefined, 15000, null]));
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        'UartRepository.upsertMaestroModule: board 0 (m1-board): 2 channel(s) saved without releaseMs; storing 5000',
+      );
+    });
+
+    it('warns for each board that had channels without releaseMs', async () => {
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      const module = maestroWith('m1', [undefined, 5000]);
+      const second = maestroWith('m2', [undefined, undefined, 5000]);
+      const secondBoard = (second.subModule as MaestroModule).boards[0];
+      (module.subModule as MaestroModule).boards.push({
+        ...secondBoard,
+        parentId: 'm1',
+        boardId: 1,
+        channels: secondBoard.channels.map((c) => ({ ...c, parentId: secondBoard.id })),
+      });
+
+      await save(module);
+
+      expect(warnSpy.mock.calls).toEqual([
+        [
+          'UartRepository.upsertMaestroModule: board 0 (m1-board): 1 channel(s) saved without releaseMs; storing 5000',
+        ],
+        [
+          'UartRepository.upsertMaestroModule: board 1 (m2-board): 2 channel(s) saved without releaseMs; storing 5000',
+        ],
+      ]);
+    });
+
+    it('does not warn when every channel has releaseMs', async () => {
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+      await save(maestroWith('m1', [5000, 15000]));
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    // saveLocations refuses a bad value first; a caller that skips it must not
+    // store one (INTEGER affinity keeps 1500.5 as REAL and 'abc' as TEXT).
+    it.each([
+      [999, '999'],
+      [1500.5, '1500.5'],
+      ['5000', '"5000"'],
+      ['abc', '"abc"'],
+    ])('refuses to store releaseMs %j, writing nothing', async (bad, shown) => {
+      await expect(save(maestroWith('m1', [5000, bad as number]))).rejects.toThrow(
+        `UartRepository.upsertMaestroModule: channel m1-ch1 has releaseMs ${shown}, not a whole number from 1000 to 120000`,
+      );
+
+      for (const table of ['uart_modules', 'maestro_boards', 'maestro_channels'] as const) {
+        expect(await db.selectFrom(table).select('id').execute()).toEqual([]);
+      }
+    });
+
+    // BACKUP_FAILED, the MIGRATION_FAILED_* modes and MIGRATION_INTERRUPTED
+    // skip, undo or stop short of m010 but still serve reads, so the table may
+    // have no release_ms column.
+    it('reads channels from a table without release_ms as 5000', async () => {
+      await save(maestroWith('m1', [15000, 15000]));
+      await db.schema.alterTable('maestro_channels').dropColumn('release_ms').execute();
+
+      expect(await loadedReleaseMs()).toEqual([5000, 5000]);
+      expect((await readMaestroChannel(db, 'm1-ch1')).releaseMs).toBe(5000);
     });
 
     it('readMaestroChannel returns releaseMs', async () => {

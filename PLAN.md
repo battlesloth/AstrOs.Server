@@ -5,10 +5,10 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 ## Status
 
 Active:  Per-channel servo release time (T-013–T-015 left, cross-repo with AstrOs.ESP T-010) and Random span events (Phase A done; T-010 and Phase B next)
-Now:     T-013 (Maestro channel release time, data model) starting on `feature/T-013-maestro-release-ms`; it ships the first `m010_` migration. AstrOs.ESP's T-010 (PR #66), T-011 (PR #67) and T-012 (PR #68) are merged; its v1.3.0 is held for this repo's T-014 and the release regression (which includes T-010's joint bench)
+Now:     T-013 (Maestro channel release time, data model) on `feature/T-013-maestro-release-ms`: implemented, verified by hand on a dev-DB copy, and through the pre-push `/pr-review-toolkit:review-pr` and its fix pass; ready for Jeff to push `develop` (the T-012/T-016 close-out commit) and then the branch, and open the PR. It ships the first `m010_` migration. Open question for Jeff: whether the Backlog's wall-clock migration-timestamp item must be fixed before T-013/T-014 reach droids. AstrOs.ESP's T-010 (PR #66), T-011 (PR #67) and T-012 (PR #68) are merged; its v1.3.0 is held for this repo's T-014 and the release regression (which includes T-010's joint bench)
 Next:    per-channel release: T-013 (data model) → T-014 (8 fields + sync gate) → joint bench in the ESP release regression → ESP v1.3.0 release; T-015 (UI field) any time after T-013. Random spans, agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 ✓ → T-007 ✓ → T-008 ✓ → server T-009 ✓ → ESP T-009 bench ✓ → ESP v1.3.0 release (now also carrying per-channel release) → server T-010 (report skipped spans on upload; before Phase B) → Phase B scripter (decomposed at phase start) → Phase C. Inserting spans by SQL for a bench: also set `scripts.duration_ds` to `MAX(COALESCE(end_time, time))` (or open and save the script once, since `duration_ds` is only recomputed on save), and keep each span row within `0 ≤ time < end_time ≤ 6000` ds, because since T-009 a stored span outside that makes every save of its script answer 400. Check: `SELECT id FROM script_events WHERE end_time IS NOT NULL AND (end_time <= time OR time < 0 OR end_time > 6000)` returns nothing
 Blocked: none. A server release carrying T-014 must wait for AstrOs.ESP v1.3.0 to be published: its gate refuses config sync to anything older
-Last:    2026-11-25 — T-016 merged (PR #140); 2026-11-22 — T-012 merged (PR #139); per-channel release time designed and planned (T-012–T-016); AstrOs.ESP T-009 bench passed against server develop; develop at `1.0.3-dev.0`
+Last:    2026-11-26 — T-012 and T-016 closed out; T-013 implemented and reviewed; 2026-11-25 — T-016 merged (PR #140); 2026-11-22 — T-012 merged (PR #139); per-channel release time designed and planned (T-012–T-016); AstrOs.ESP T-009 bench passed against server develop; develop at `1.0.3-dev.0`
 
 ## Random span events
 
@@ -263,6 +263,10 @@ From the T-016 reviews (2026-11-22): two pre-existing issues in `initializeDatab
   - Not done in T-016: plain read-only still runs the serial worker and the WS handlers, and an unguarded write there would then throw at runtime. That needs its own audit of those handlers first.
 - **One runtime list of read-only reason codes.** Four test lists (API status and write guard, Vue store and interceptor) repeat every plain code by hand, and nothing fails when a new code is missing from them. Derive `ReadOnlyReasonCode` from an exported `as const` array on each side, and have the tests filter it.
 - **The sentinel's `backupPath` is stored as the process saw it** (absolute in Docker; relative under a dev `DATABASE_PATH` such as `../.data`). A data dir reached by another path later (a changed `DATABASE_PATH`, a different `$HOME` over the same volume) reads as "its backup … is missing" and stops; the log then asks for a copy at a path the operator may not be able to reach (one outside the Docker mount, say). Moving the data dir back is the way out. A fallback to the same basename beside the database would avoid that. Checking `backupPath === <db>.backup-<lastApplied>` would also catch a hand-edited sentinel naming any file.
+
+From the T-013 pre-push review (2026-11-26; pre-existing):
+
+- **`saveLocations` writes each location in its own transaction.** A body the validators don't cover (a Maestro module with `subModule: null`, `channels` as a string) commits dome, then fails body with a 500, leaving dome written and `outofdate`. One transaction around all three `updateLocation` calls would make a save all-or-nothing. `updateLocation` returns `true` or throws, so the `success`/`'failed'` 500 branch can never run.
 
 Open local branches (pre-workflow threads, unmerged into `develop`):
 

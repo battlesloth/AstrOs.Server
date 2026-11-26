@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findInvalidReleaseMs } from './release_ms.js';
+import { findInvalidReleaseMs, RELEASE_MS_DEFAULT } from './release_ms.js';
 import type { LocationCollection } from 'src/models/location_collection.js';
 
 const ABSENT = Symbol('absent');
@@ -7,28 +7,33 @@ const ABSENT = Symbol('absent');
 // Plain objects, as `PUT /api/locations/` receives them from JSON. 104 is
 // ModuleSubType.maestro and 102 ModuleSubType.kangaroo, written as literals so
 // a renumbered enum can't move both sides of the test together.
+// Board ids start at 2 and channel numbers at 4, so a problem built from array
+// positions instead of `boardId` and `channelNumber` can't match.
+function board(releaseMs: unknown[], boardId = 2) {
+  return {
+    id: `board-${boardId}`,
+    boardId,
+    name: `Board ${boardId}`,
+    channels: releaseMs.map((value, i) => ({
+      id: `b${boardId}-ch${i}`,
+      channelNumber: i + 4,
+      ...(value === ABSENT ? {} : { releaseMs: value }),
+    })),
+  };
+}
+
 function maestroModule(name: string, releaseMs: unknown[], extra: Record<string, unknown> = {}) {
   return {
     id: `${name}-id`,
     name,
     moduleSubType: 104,
-    subModule: {
-      boards: [
-        {
-          id: `${name}-board`,
-          boardId: 0,
-          name: 'Board 1',
-          channels: releaseMs.map((value, i) => ({
-            id: `${name}-ch${i}`,
-            channelNumber: i,
-            ...(value === ABSENT ? {} : { releaseMs: value }),
-          })),
-        },
-      ],
-    },
+    subModule: { boards: [board(releaseMs)] },
     ...extra,
   };
 }
+
+const problem = (where: string, value: string) =>
+  `${where}: releaseMs ${value} is not a whole number from 1000 to 120000`;
 
 function collection(parts: Partial<Record<keyof LocationCollection, unknown>>): LocationCollection {
   return parts as unknown as LocationCollection;
@@ -53,12 +58,18 @@ describe('findInvalidReleaseMs', () => {
     ['true', true],
   ])('flags %s, naming the location, module, board, channel and value', (shown, value) => {
     expect(findInvalidReleaseMs(domeWith(5000, value))).toEqual([
-      `dome, module "Dome Maestro", board 0, channel 1: releaseMs ${shown} is not a whole number from 1000 to 120000`,
+      problem('dome, module "Dome Maestro", board 2, channel 5', shown),
     ]);
   });
 
   it.each([1000, 5000, 120000])('accepts %s', (value) => {
     expect(findInvalidReleaseMs(domeWith(value))).toEqual([]);
+  });
+
+  // The repository stores the default for every channel saved without the
+  // field; a default outside the range would make each later save a 400.
+  it('accepts RELEASE_MS_DEFAULT', () => {
+    expect(findInvalidReleaseMs(domeWith(RELEASE_MS_DEFAULT))).toEqual([]);
   });
 
   it('ignores an absent releaseMs, whether the key is missing or undefined', () => {
@@ -75,10 +86,82 @@ describe('findInvalidReleaseMs', () => {
     );
 
     expect(problems).toEqual([
-      'dome, module "Dome Maestro", board 0, channel 0: releaseMs 1 is not a whole number from 1000 to 120000',
-      'dome, module "Dome Maestro", board 0, channel 2: releaseMs 2 is not a whole number from 1000 to 120000',
-      'core, module "Core Maestro", board 0, channel 2: releaseMs "x" is not a whole number from 1000 to 120000',
-      'body, module "Body Maestro", board 0, channel 0: releaseMs 999 is not a whole number from 1000 to 120000',
+      problem('dome, module "Dome Maestro", board 2, channel 4', '1'),
+      problem('dome, module "Dome Maestro", board 2, channel 6', '2'),
+      problem('core, module "Core Maestro", board 2, channel 6', '"x"'),
+      problem('body, module "Body Maestro", board 2, channel 4', '999'),
+    ]);
+  });
+
+  // The Vue store sends a location it hasn't loaded as null, and other
+  // clients may leave a key out; neither may end the walk.
+  it.each([
+    ['null', { domeModule: null, coreModule: null }],
+    ['missing', {}],
+  ])('checks body when dome and core are %s', (_label, before) => {
+    expect(
+      findInvalidReleaseMs(
+        collection({
+          ...before,
+          bodyModule: { uartModules: [maestroModule('Body Maestro', [999])] },
+        }),
+      ),
+    ).toEqual([problem('body, module "Body Maestro", board 2, channel 4', '999')]);
+  });
+
+  // A droid with a Kangaroo drive and a Maestro is a real setup.
+  it('checks a Maestro module that follows another UART module', () => {
+    const kangaroo = maestroModule('Kangaroo', [5000], { moduleSubType: 102 });
+
+    expect(
+      findInvalidReleaseMs(
+        collection({
+          domeModule: { uartModules: [kangaroo, maestroModule('Dome Maestro', [999])] },
+        }),
+      ),
+    ).toEqual([problem('dome, module "Dome Maestro", board 2, channel 4', '999')]);
+  });
+
+  it('checks every Maestro module in a location', () => {
+    expect(
+      findInvalidReleaseMs(
+        collection({
+          domeModule: {
+            uartModules: [maestroModule('First', [5000]), maestroModule('Second', [999])],
+          },
+        }),
+      ),
+    ).toEqual([problem('dome, module "Second", board 2, channel 4', '999')]);
+  });
+
+  it('checks a Maestro module that follows one without boards', () => {
+    const noBoards = { ...maestroModule('Empty', []), subModule: null };
+
+    expect(
+      findInvalidReleaseMs(
+        collection({
+          domeModule: { uartModules: [noBoards, maestroModule('Dome Maestro', [999])] },
+        }),
+      ),
+    ).toEqual([problem('dome, module "Dome Maestro", board 2, channel 4', '999')]);
+  });
+
+  it('checks the boards after one without channels', () => {
+    const mod = maestroModule('Dome Maestro', [5000]);
+    mod.subModule.boards.unshift({} as ReturnType<typeof board>);
+    mod.subModule.boards.push(board([999], 3));
+
+    expect(findInvalidReleaseMs(collection({ domeModule: { uartModules: [mod] } }))).toEqual([
+      problem('dome, module "Dome Maestro", board 3, channel 4', '999'),
+    ]);
+  });
+
+  it('checks every board of a module', () => {
+    const mod = maestroModule('Dome Maestro', [5000]);
+    mod.subModule.boards.push(board([5000, 999], 3));
+
+    expect(findInvalidReleaseMs(collection({ domeModule: { uartModules: [mod] } }))).toEqual([
+      problem('dome, module "Dome Maestro", board 3, channel 5', '999'),
     ]);
   });
 
@@ -95,12 +178,44 @@ describe('findInvalidReleaseMs', () => {
   // String() throws on this JSON-parsable value; a refusal must stay a 400.
   it('describes a value whose string conversion throws', () => {
     expect(findInvalidReleaseMs(domeWith({ toString: 0, valueOf: 0 }))).toEqual([
-      'dome, module "Dome Maestro", board 0, channel 0: releaseMs {"toString":0,"valueOf":0} is not a whole number from 1000 to 120000',
+      problem('dome, module "Dome Maestro", board 2, channel 4', '{"toString":0,"valueOf":0}'),
     ]);
   });
 
-  // A malformed body still reaches the repository and behaves there as it did
-  // before the check; the validator only has to not throw on it.
+  // A cycle makes JSON.stringify throw on every Node version; the refusal
+  // must stay a 400, not a 500.
+  it('describes a value JSON.stringify cannot print', () => {
+    const cyclic: unknown[] = [];
+    cyclic.push(cyclic);
+
+    expect(findInvalidReleaseMs(domeWith(cyclic))).toEqual([
+      problem('dome, module "Dome Maestro", board 2, channel 4', '(unprintable object)'),
+    ]);
+  });
+
+  // Deep nesting that fits inside express.json's 100 kB limit overflows the
+  // stack in JSON.stringify on today's Node; whatever it prints, the walk must
+  // not throw.
+  it('does not throw on a deeply nested value', () => {
+    const deep = JSON.parse('['.repeat(20000) + ']'.repeat(20000));
+
+    expect(findInvalidReleaseMs(domeWith(deep))).toHaveLength(1);
+  });
+
+  // Characterization: `${undefined}` prints "undefined" with or without
+  // formatJsonValue's `?? 'undefined'`, which is there for its `string` type.
+  it('names a module or channel that is missing its name or number', () => {
+    const mod = maestroModule('x', [999]);
+    delete (mod as { name?: string }).name;
+    delete (mod.subModule.boards[0].channels[0] as { channelNumber?: number }).channelNumber;
+
+    expect(findInvalidReleaseMs(collection({ domeModule: { uartModules: [mod] } }))).toEqual([
+      problem('dome, module undefined, board 2, channel undefined', '999'),
+    ]);
+  });
+
+  // A malformed body is left for the repository to handle (or fail on); the
+  // validator only has to not throw on it.
   it.each([
     ['an empty body', {}],
     ['a location without uartModules', { domeModule: {} }],
@@ -113,6 +228,10 @@ describe('findInvalidReleaseMs', () => {
     [
       'boards that is not an array',
       { domeModule: { uartModules: [{ moduleSubType: 104, subModule: { boards: 1 } }] } },
+    ],
+    [
+      'a board without channels',
+      { domeModule: { uartModules: [{ moduleSubType: 104, subModule: { boards: [{}] } }] } },
     ],
     [
       'a null board and a null channel',

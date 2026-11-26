@@ -66,6 +66,9 @@ The warning keys are `module_view.sync_skipped_below_minimum` (`{controller}`, `
   - log each skip at `info`, with location, controller, version and reason
 - **Minimum:** raise both constants.
 - **Vue:** the toasts and i18n keys.
+- **From the T-013 pre-push review (2026-11-26):**
+  - the smoke test's bench fixture (`astros_smoke_test/src/core/fixtures/demo-location.ts`) builds its `ConfigSync` from `MaestroChannel`s at `RELEASE_MS_DEFAULT`, so its `format-and-sync` scenario sends 8 fields once the generator does; run it only against boards with ESP T-010, and run the smoke project's typecheck and tests with this task's
+  - `.docs/qa/maestro-channel-release.md`: its intro and case 11 say the string stays at 7 fields until T-014; update both to 8
 - **QA plan `.docs/qa/firmware-version-gating.md`:**
   - preconditions say minimum 1.3.0, with bench firmware ≥ 1.3.0 that contains ESP T-010
   - new cases:

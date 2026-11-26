@@ -25,6 +25,10 @@
 - **Accessibility:** a `<label for>` matched to the input's `id`; the help text linked with `aria-describedby`; the range error with `role="alert"`.
 - **Storybook:** update `AstrosServoSettings.stories.ts` with a default (5.0) story and an actuator (15.0) story.
 - **Spec file:** `components/modules/shared/__tests__/AstrosServoSettings.spec.ts`.
+- **From the T-013 reviews (2026-11-26):**
+  - **The refused save.** `stores/location.ts` `saveLocationsToApi` keeps only the axios message, so a 400 `invalid_release_ms` shows as "Request failed with status code 400", without `problems`. Show an i18n message for that code that names the channel. A stored value outside the range (set by SQL before this task) loads into the model, and the page sends it back, so every save of every location answers 400 until it is fixed. That includes a digital or disabled channel, where the field is hidden. Give the operator a way out. Parsing the English `problems` strings is fragile, so a structured list returned alongside them is the builder's call.
+  - **The components' local channel types.** `AstrosMaestroChannel.vue` (`MaestroChannel`) and `AstrosMaestroModule.vue` (`MaestroChannelType`, `MaestroBoard`, `MaestroModule`) declare their own interfaces without `releaseMs`. Replace them with `import type { … } from '@/models'`, not by adding the field to the copies. The server stores 5000 for a channel saved without the field, so a rebuild that drops it would reset a custom value with no error: today the type select spreads the channel and the other fields are edited in place.
+  - **A component test that an edit keeps `releaseMs`:** e.g. switching a channel's type keeps `releaseMs: 15000`.
 - **QA plan:** add the UI cases to `.docs/qa/maestro-channel-release.md` (created by T-013 with the API-level cases):
   - preconditions: T-013 + T-014, firmware with ESP T-010
   - cases:
@@ -43,6 +47,8 @@
   - 0.9 and 120.1 emit nothing and show the error
   - loading `releaseMs: 15000` shows 15.0
 - [ ] Mutation check: drop the range guard and see the 0.9 test fail.
+- [ ] A refused save (`invalid_release_ms`) shows a message naming the channel, and a stored out-of-range value on a channel whose field is hidden can still be fixed from the page.
+- [ ] The Maestro components use the model types, and a spec shows that editing a channel keeps its `releaseMs`.
 - [ ] Both stories render.
 - [ ] The QA plan's UI cases are added.
 - [ ] QA walk with Jeff.

@@ -29,7 +29,7 @@ The plan grows with the project. T-007 added the data model, so this file starts
 ### 1. The upgrade applies migration 9 after a backup
 
 1. Start the API as above and watch its log.
-2. **Pass:** `Created pre-migration backup at /tmp/astros-span-upgrade/database.sqlite3.backup-8_fix_script_duration_units`, then `migration "9_add_script_event_end_time" was executed successfully`. There is no read-only banner in the UI.
+2. **Pass:** `Created pre-migration backup at /tmp/astros-span-upgrade/database.sqlite3.backup-8_fix_script_duration_units`, then `migration "9_add_script_event_end_time" was executed successfully` (on a build with T-013, `migration "m010_add_maestro_release_ms" was executed successfully` follows it). There is no read-only banner in the UI.
 3. **Pass:** `sqlite3 $DB "SELECT count(*) FROM script_events WHERE end_time IS NOT NULL"` prints `0`.
 4. **Fail:** `Migration failed`, any read-only reason code, or a non-zero count.
 
@@ -73,7 +73,7 @@ A server built before T-007 does not know migration 9. Builds from T-006 on refu
    DATABASE_PATH=/tmp/astros-span-upgrade npm run start:tsx
    ```
    Keep the Vue dev server from this build running.
-3. **Pass:** the log has `Entering read-only mode (DB_NEWER_THAN_SERVER): database has migrations this build does not know: 9_add_script_event_end_time`. The open tab switches to the "Incompatible database" notice (as in `system-readonly-mode.md` case 10), and `curl -s -i localhost:3000/api/scripts` returns 503.
+3. **Pass:** the log has `Entering read-only mode (DB_NEWER_THAN_SERVER): database has migrations this build does not know: 9_add_script_event_end_time` (`9_add_script_event_end_time, m010_add_maestro_release_ms` when case 1 ran on a build with T-013). The open tab switches to the "Incompatible database" notice (as in `system-readonly-mode.md` case 10), and `curl -s -i localhost:3000/api/scripts` returns 503.
 4. Stop the old API, then run `sha256sum -c /tmp/astros-span-upgrade.sha256` and `ls /tmp/astros-span-upgrade`.
 5. **Pass:** the checksum is `OK`, and the directory holds only `database.sqlite3` and the case 1 `.backup-8_fix_script_duration_units`.
 6. **Fail:** the old build boots normally, migrates or backs up, or the checksum changes.

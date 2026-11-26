@@ -184,6 +184,27 @@ describe('Locations Controller', () => {
       );
     });
 
+    // Each problem already contains ", ", so the log joins them with "; ".
+    it('reports every bad channel, in the reply and in one warn line', async () => {
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      const sent = await locationsAsSent();
+      const [ch0, ch1] = sent.bodyModule.uartModules[0].subModule.boards[0].channels;
+      ch0.releaseMs = 999;
+      ch1.releaseMs = 'x';
+      const res = mockRes();
+
+      await saveLocations(db, { body: sent }, res, vi.fn());
+
+      const problems = [
+        'body, module "Body Maestro", board 0, channel 0: releaseMs 999 is not a whole number from 1000 to 120000',
+        'body, module "Body Maestro", board 0, channel 1: releaseMs "x" is not a whole number from 1000 to 120000',
+      ];
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ message: 'invalid_release_ms', problems });
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(`saveLocations: refused: ${problems.join('; ')}`);
+    });
+
     it('saves a valid releaseMs', async () => {
       const sent = await locationsAsSent();
       sent.bodyModule.uartModules[0].subModule.boards[0].channels[1].releaseMs = 120000;
