@@ -18,6 +18,7 @@ const maestroChannel: MaestroChannel = {
   maxPos: 2500,
   homePos: 1500,
   inverted: false,
+  releaseMs: 5000,
 };
 
 const gpioChannel: GpioChannel = {

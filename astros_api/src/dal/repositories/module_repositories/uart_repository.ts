@@ -6,6 +6,7 @@ import {
   KangarooX2Channel,
   MaestroChannel,
   ModuleSubType,
+  RELEASE_MS_DEFAULT,
   UartModule,
   UartChannel,
 } from 'src/models/index.js';
@@ -290,6 +291,9 @@ async function upsertMaestroModule(
       const minPos = Number.isFinite(channel.minPos) ? channel.minPos : 500;
       const maxPos = Number.isFinite(channel.maxPos) ? channel.maxPos : 2500;
       const homePos = Number.isFinite(channel.homePos) ? channel.homePos : 1250;
+      // An absent releaseMs (a browser tab from before the field existed)
+      // gets the default; saveLocations has already refused a bad one.
+      const releaseMs = channel.releaseMs ?? RELEASE_MS_DEFAULT;
 
       await trx
         .insertInto('maestro_channels')
@@ -304,6 +308,7 @@ async function upsertMaestroModule(
           max_pos: maxPos,
           home_pos: homePos,
           inverted: channel.inverted ? 1 : 0,
+          release_ms: releaseMs,
         })
         .onConflict((c) =>
           c.column('id').doUpdateSet((eb) => ({
@@ -316,6 +321,7 @@ async function upsertMaestroModule(
             max_pos: eb.ref('excluded.max_pos'),
             home_pos: eb.ref('excluded.home_pos'),
             inverted: eb.ref('excluded.inverted'),
+            release_ms: eb.ref('excluded.release_ms'),
           })),
         )
         .executeTakeFirst()
@@ -380,6 +386,7 @@ async function loadMaestroModule(
           c.max_pos,
           c.home_pos,
           c.inverted > 0,
+          c.release_ms,
         ),
       );
     }
@@ -445,6 +452,7 @@ export async function readMaestroChannel(
     channel.max_pos,
     channel.home_pos,
     channel.inverted > 0,
+    channel.release_ms,
   );
 }
 

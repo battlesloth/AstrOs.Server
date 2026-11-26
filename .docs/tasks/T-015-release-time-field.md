@@ -25,7 +25,7 @@
 - **Accessibility:** a `<label for>` matched to the input's `id`; the help text linked with `aria-describedby`; the range error with `role="alert"`.
 - **Storybook:** update `AstrosServoSettings.stories.ts` with a default (5.0) story and an actuator (15.0) story.
 - **Spec file:** `components/modules/shared/__tests__/AstrosServoSettings.spec.ts`.
-- **QA plan:** new `.docs/qa/maestro-channel-release.md`:
+- **QA plan:** add the UI cases to `.docs/qa/maestro-channel-release.md` (created by T-013 with the API-level cases):
   - preconditions: T-013 + T-014, firmware with ESP T-010
   - cases:
     - the field shows on a servo channel and hides on a digital one
@@ -44,7 +44,7 @@
   - loading `releaseMs: 15000` shows 15.0
 - [ ] Mutation check: drop the range guard and see the 0.9 test fail.
 - [ ] Both stories render.
-- [ ] The QA plan is added.
+- [ ] The QA plan's UI cases are added.
 - [ ] QA walk with Jeff.
 
 ## Out of scope

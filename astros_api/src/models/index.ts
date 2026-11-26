@@ -16,6 +16,10 @@ export { HumanCyborgRelationsModule } from './control_module/uart/sub_modules/hu
 export type { MaestroModule } from './control_module/uart/sub_modules/maestro/maestro_module.js';
 export type { MaestroBoard } from './control_module/uart/sub_modules/maestro/maestro_board.js';
 export { MaestroChannel } from './control_module/uart/sub_modules/maestro/maestro_channel.js';
+export {
+  RELEASE_MS_DEFAULT,
+  findInvalidReleaseMs,
+} from './control_module/uart/sub_modules/maestro/release_ms.js';
 export type { PwmModule } from './control_module/i2c/sub_modules/pca9685/pwm_module.js';
 export { PwmChannel } from './control_module/i2c/sub_modules/pca9685/pwm_channel.js';
 export { UartModule, getUartScriptResources } from './control_module/uart/uart_module.js';

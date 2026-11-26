@@ -90,6 +90,7 @@ describe('script conversion, save → convert', () => {
       2500,
       1500,
       false,
+      5000,
     );
     const maestroModule: MaestroModule = {
       boards: [

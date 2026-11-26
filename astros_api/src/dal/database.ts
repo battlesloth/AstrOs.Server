@@ -25,6 +25,7 @@ import {
   migration_7,
   migration_8,
   migration_9,
+  migration_m010,
 } from './migrations/index.js';
 import { SystemStatus } from '../system_status.js';
 import {
@@ -74,6 +75,7 @@ export const PRODUCTION_MIGRATIONS: Readonly<Record<string, Migration>> = Object
   '7_rename_remote_config_key': migration_7,
   '8_fix_script_duration_units': migration_8,
   '9_add_script_event_end_time': migration_9,
+  m010_add_maestro_release_ms: migration_m010,
 });
 
 const defaultMigrationProvider: MigrationProvider = new (class implements MigrationProvider {

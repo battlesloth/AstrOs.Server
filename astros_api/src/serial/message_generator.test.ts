@@ -325,11 +325,11 @@ function generateMaestroBoard(parentId: string): MaestroBoard {
   };
 
   board.channels.push(
-    new MaestroChannel(uuid(), board.id, `channel 1`, true, 1, true, 800, 2000, 1400, false),
+    new MaestroChannel(uuid(), board.id, `channel 1`, true, 1, true, 800, 2000, 1400, false, 5000),
   );
 
   board.channels.push(
-    new MaestroChannel(uuid(), board.id, `channel 2`, true, 2, false, 500, 2500, 1500, true),
+    new MaestroChannel(uuid(), board.id, `channel 2`, true, 2, false, 500, 2500, 1500, true, 5000),
   );
 
   return board;

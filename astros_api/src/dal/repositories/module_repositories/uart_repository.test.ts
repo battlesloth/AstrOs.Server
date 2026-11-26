@@ -11,7 +11,7 @@ import {
   MaestroChannel,
 } from '../../../models/index.js';
 import type { KangarooX2, MaestroModule, MaestroBoard } from '../../../models/index.js';
-import { getUartModules, upsertUartModules } from './uart_repository.js';
+import { getUartModules, readMaestroChannel, upsertUartModules } from './uart_repository.js';
 import { v4 as uuid } from 'uuid';
 
 describe('UartRepository', () => {
@@ -248,6 +248,7 @@ describe('UartRepository', () => {
       undefined as any, // Invalid maxPos
       undefined as any, // Invalid homePos
       false,
+      5000,
     );
 
     // Channel 2: NaN values (simulating invalid number input)
@@ -262,6 +263,7 @@ describe('UartRepository', () => {
       NaN, // Invalid maxPos
       NaN, // Invalid homePos
       false,
+      5000,
     );
 
     // Channel 3: null values
@@ -276,6 +278,7 @@ describe('UartRepository', () => {
       null as any, // Invalid maxPos
       null as any, // Invalid homePos
       false,
+      5000,
     );
 
     board.channels.push(channel1, channel2, channel3);
@@ -313,5 +316,104 @@ describe('UartRepository', () => {
     expect(savedChannel3!.minPos).toBe(500);
     expect(savedChannel3!.maxPos).toBe(2500);
     expect(savedChannel3!.homePos).toBe(1250);
+  });
+
+  describe('Maestro channel releaseMs', () => {
+    let locationId: string;
+
+    beforeEach(async () => {
+      locationId = (
+        await db
+          .selectFrom('locations')
+          .select(['id'])
+          .where('name', '=', location)
+          .executeTakeFirstOrThrow()
+      ).id;
+    });
+
+    // One Maestro module with one board; each entry is a channel's releaseMs,
+    // or undefined for a channel saved without the field (a stale browser tab).
+    function maestroWith(modId: string, releaseMs: (number | undefined | null)[]): UartModule {
+      const module = new UartModule(
+        0,
+        modId,
+        'Maestro Module',
+        locationId,
+        ModuleSubType.maestro,
+        1,
+        9600,
+      );
+      const boardId = `${modId}-board`;
+      const board: MaestroBoard = {
+        id: boardId,
+        parentId: modId,
+        boardId: 0,
+        name: 'Board 1',
+        channelCount: releaseMs.length,
+        channels: releaseMs.map(
+          (ms, i) =>
+            new MaestroChannel(
+              `${modId}-ch${i}`,
+              boardId,
+              `Channel ${i}`,
+              true,
+              i,
+              true,
+              500,
+              2500,
+              1500,
+              false,
+              ms as number,
+            ),
+        ),
+      };
+      module.subModule = { boards: [board] } satisfies MaestroModule;
+      return module;
+    }
+
+    async function save(module: UartModule): Promise<void> {
+      await db.transaction().execute(async (trx) => {
+        await upsertUartModules(trx, [module]);
+      });
+    }
+
+    async function loadedReleaseMs(): Promise<number[]> {
+      const [mod] = await getUartModules(db, locationId);
+      return (mod.subModule as MaestroModule).boards[0].channels.map((c) => c.releaseMs);
+    }
+
+    it('loads the releaseMs each channel was saved with', async () => {
+      await save(maestroWith('m1', [15000, 1000, 120000]));
+
+      expect(await loadedReleaseMs()).toEqual([15000, 1000, 120000]);
+    });
+
+    it('stores 5000 for a channel saved without releaseMs', async () => {
+      await save(maestroWith('m1', [undefined, 15000]));
+
+      expect(await loadedReleaseMs()).toEqual([5000, 15000]);
+    });
+
+    // saveLocations refuses a null; the repository still must not hand one to
+    // a NOT NULL column (Kysely drops undefined keys, but sends null).
+    it('stores 5000 for a null releaseMs', async () => {
+      await save(maestroWith('m1', [null, 15000]));
+
+      expect(await loadedReleaseMs()).toEqual([5000, 15000]);
+    });
+
+    it('a later save replaces releaseMs, and one without it resets it to 5000', async () => {
+      await save(maestroWith('m1', [15000, 15000]));
+
+      await save(maestroWith('m1', [20000, undefined]));
+
+      expect(await loadedReleaseMs()).toEqual([20000, 5000]);
+    });
+
+    it('readMaestroChannel returns releaseMs', async () => {
+      await save(maestroWith('m1', [5000, 42000]));
+
+      expect((await readMaestroChannel(db, 'm1-ch1')).releaseMs).toBe(42000);
+    });
   });
 });

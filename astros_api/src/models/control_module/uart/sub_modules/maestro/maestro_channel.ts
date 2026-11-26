@@ -10,6 +10,8 @@ export class MaestroChannel extends UartChannel {
   homePos: number;
   // if not servo, this is default low value
   inverted: boolean;
+  // minimum powered time after a move, in ms (release_ms.ts holds the range)
+  releaseMs: number;
 
   constructor(
     id: string,
@@ -22,6 +24,7 @@ export class MaestroChannel extends UartChannel {
     maxPos: number,
     homePos: number,
     inverted: boolean,
+    releaseMs: number,
   ) {
     super(id, parentId, channelName, ModuleSubType.maestro, enabled);
 
@@ -31,5 +34,6 @@ export class MaestroChannel extends UartChannel {
     this.maxPos = maxPos;
     this.homePos = homePos;
     this.inverted = inverted;
+    this.releaseMs = releaseMs;
   }
 }

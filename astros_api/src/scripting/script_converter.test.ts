@@ -1118,6 +1118,7 @@ function coreMaestroScriptCh(isServo: boolean, channelNumber = 4): ScriptChannel
     2500,
     1500,
     false,
+    5000,
   );
 
   return {
