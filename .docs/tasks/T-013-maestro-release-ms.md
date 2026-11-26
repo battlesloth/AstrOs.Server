@@ -72,4 +72,15 @@
 
 ## Implementation checklist
 
-<!-- Added when work starts. -->
+No failure-mode inventory: an additive column and a pure validator. An interrupted `m010` run is T-016's restore path; `up` still skips the `ALTER` when the column is already there, as `migration_9` does.
+
+- [ ] RED → GREEN: `m010_add_maestro_release_ms` (`m010_add_maestro_release_ms.test.ts`, after `migration_9.test.ts`): `INTEGER NOT NULL DEFAULT 5000`; a pre-existing row reads 5000; an insert without the column gets 5000; `up` is a no-op when the column exists but the migration is unrecorded; `down` drops it. Registered in `PRODUCTION_MIGRATIONS` and `migrations/index.ts`; runs last on a fresh database (Kysely's run order), with `database.test.ts`'s name guard green
+- [ ] RED → GREEN: `release_ms.ts` constants and `findInvalidReleaseMs` (`release_ms.test.ts`): flags 999, 120001, 1500.5, `NaN` and `"5000"` (also `null`, `Infinity`); accepts 1000, 5000, 120000; ignores an absent value; checks only Maestro UART modules; each problem names the location, the module, the channel number and the value; a malformed body or a value whose conversion throws doesn't throw
+- [ ] API model: `releaseMs` as the last `MaestroChannel` constructor parameter; every `new MaestroChannel(` call site, tests included
+- [ ] RED → GREEN: repository round-trip (`uart_repository.test.ts`): 15000 → 15000; absent → 5000; an update changes it (`excluded.release_ms`); `readMaestroChannel` returns it
+- [ ] RED → GREEN: `PUT /api/locations/` (`locations_controller.test.ts`, `saveLocations` exported): a good dome change plus one bad body channel → 400 `{ message: 'invalid_release_ms', problems }`, and dome reads back unchanged (`config_fingerprint` included); an absent `releaseMs` → 200 and 5000. Mutation: the validation moved after the first `updateLocation` fails it
+- [ ] Vue: `MaestroChannel.releaseMs`, `constants/maestro.ts`, the `useModuleManagement` new-channel default (spec), type errors in stories, specs and fixtures
+- [ ] QA: new `.docs/qa/maestro-channel-release.md` with the API cases (upgrade default, refused save, stale-tab save); T-015 adds the UI cases (its task file said "new")
+- [ ] Pre-commit: api prettier + lint, build, vitest; vue format + lint, build, vitest; code review
+- [ ] Verification by hand on a copy of the dev database (Verification section)
+- [ ] Pre-push `/pr-review-toolkit:review-pr`; PLAN.md close-out at merge
