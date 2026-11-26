@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { findInvalidReleaseMs, RELEASE_MS_DEFAULT } from './release_ms.js';
-import type { LocationCollection } from 'src/models/location_collection.js';
 
 const ABSENT = Symbol('absent');
 
@@ -35,11 +34,12 @@ function maestroModule(name: string, releaseMs: unknown[], extra: Record<string,
 const problem = (where: string, value: string) =>
   `${where}: releaseMs ${value} is not a whole number from 1000 to 120000`;
 
-function collection(parts: Partial<Record<keyof LocationCollection, unknown>>): LocationCollection {
-  return parts as unknown as LocationCollection;
+// The keys stay checked, so a typo can't make a test pass by being ignored.
+function collection(parts: Partial<Record<'domeModule' | 'coreModule' | 'bodyModule', unknown>>) {
+  return parts;
 }
 
-function domeWith(...releaseMs: unknown[]): LocationCollection {
+function domeWith(...releaseMs: unknown[]) {
   return collection({ domeModule: { uartModules: [maestroModule('Dome Maestro', releaseMs)] } });
 }
 

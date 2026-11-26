@@ -39,7 +39,7 @@
   - `loadMaestroModule` and `readMaestroChannel`
   - the API model
   - every `new MaestroChannel(` call site, tests included (`message_generator.test.ts`, `script_repository.test.ts`, `uart_repository.test.ts`, `script_converter*.test.ts`), and the smoke test's bench fixture `astros_smoke_test/src/core/fixtures/demo-location.ts`, which imports the API model (added by the pre-push review)
-- **Validator:** a pure `findInvalidReleaseMs(collection: LocationCollection): string[]` in `release_ms.ts`. `saveLocations` calls it first and answers 400 on any problem.
+- **Validator:** a pure `findInvalidReleaseMs(body: unknown): string[]` in `release_ms.ts` (amended, Jeff, 2026-11-26: first `(collection: LocationCollection)`; the body is untrusted JSON, so the parameter says so). `saveLocations` calls it first and answers 400 on any problem.
 - **Vue:** the model field, the constants file, and the new-channel default. Fix the type errors the new field raises in stories, specs and fixtures.
 
 ## Acceptance criteria
@@ -118,7 +118,10 @@ No failure-mode inventory: an additive column and a pure validator. On an upgrad
 **Declined:**
 - **A shape check in the migration's skip:** only a hand-run `ALTER` reaches it.
 - **A `releaseMsOrDefault` helper:** the throw already makes the fallback load-bearing.
-- **Contract notes for Jeff, not changed:** `findInvalidReleaseMs(body: unknown)` as the signature; structured problems (left to T-015); the 11-parameter constructor (an options object would be its own task).
+- **Contract notes, decided by Jeff (2026-11-26):**
+  - `findInvalidReleaseMs(body: unknown)` is taken here (the Task line above).
+  - A structured list of the refused channels is pinned in T-015's Contract.
+  - The 11-parameter constructor goes to T-018 (`.docs/tasks/T-018-named-constructor-fields.md`), a post-release refactor to named fields across the app.
 
 **Review of the pre-push fix pass (2026-11-26, fresh-context reviewer):** no Critical or Important findings and no production bug. The throw can't fire on today's only write path, the warn doesn't fire for a current client, and the read default's read-only claim holds. Fixed:
 - **Wrong comment:** "SQLite would keep '5000' as TEXT". INTEGER affinity converts it to 5000 (checked with the CLI); only non-numeric text such as `'abc'` stays TEXT. The refusal test now covers `'abc'`.

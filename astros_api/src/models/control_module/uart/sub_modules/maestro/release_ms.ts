@@ -1,6 +1,5 @@
 import { Constants } from 'src/models/constants.js';
 import { ModuleSubType } from 'src/models/enums.js';
-import type { LocationCollection } from 'src/models/location_collection.js';
 
 // A Maestro channel's minimum powered time after a move, in ms. Firmware
 // 1.3.0+ (ESP T-010) releases a servo channel at max(releaseMs, modeled
@@ -34,13 +33,12 @@ export function isValidReleaseMs(value: unknown): boolean {
  * RELEASE_MS_MAX. An absent (`undefined`) value is not a problem: the
  * repository stores RELEASE_MS_DEFAULT for it.
  *
- * The body is untrusted JSON (saveLocations passes `req.body`, typed only by
- * this parameter), so the walk treats it as `unknown` and skips anything that
- * isn't the expected shape instead of throwing. A malformed body is left for
- * the repository to handle (or fail on).
+ * The body is untrusted JSON (saveLocations passes `req.body` as received),
+ * so the walk skips anything that isn't the expected shape instead of
+ * throwing. A malformed body is left for the repository to handle (or fail
+ * on).
  */
-export function findInvalidReleaseMs(collection: LocationCollection): string[] {
-  const body: unknown = collection;
+export function findInvalidReleaseMs(body: unknown): string[] {
   const problems: string[] = [];
 
   for (const [key, locationName] of LOCATIONS) {
