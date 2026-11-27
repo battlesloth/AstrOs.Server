@@ -159,10 +159,12 @@ describe('resolveDatabaseDir', () => {
 });
 
 // The naming rules for migrations (T-012). Kysely resolves migrations in plain
-// .sort() order and breaks same-timestamp ties among executed ones with
-// localeCompare, so all three orders must agree on the registry; the legacy
-// names are frozen; m numbers run 010..899 (m9NN is reserved for injected test
-// migrations) and are each used once.
+// .sort() order, and compareMigrationNames must agree with it on the registry.
+// The guard also keeps localeCompare in step: it broke same-timestamp ties in
+// Kysely's own order check, which migrateToLatest turns off (T-017; Migrators
+// built by the migration tests still run it), and it costs nothing to keep.
+// The legacy names are frozen; m numbers run 010..899 (m9NN is reserved for
+// injected test migrations) and are each used once.
 const FROZEN_LEGACY_NAMES = [
   '0_initial',
   '1_add_script_evt_id',

@@ -17,6 +17,7 @@ import {
   checkPendingMigrations,
   compareMigrationNames,
   findUnknownAppliedMigrations,
+  migrationOrderProblem,
   getLastAppliedMigrationName,
   createBackup,
   pruneOldBackups,
@@ -1051,5 +1052,97 @@ describe('sentinelBackupProblem', () => {
     expect(sentinelBackupProblem({ backupPath, lastApplied: '9_x' }, KNOWN)).toMatch(
       /no record of migration 9_x/,
     );
+  });
+});
+
+// Kysely's own check orders applied migrations by their recorded clock time,
+// which a droid without a battery-backed clock can get wrong (T-017). This
+// check compares names only.
+describe('migrationOrderProblem', () => {
+  const KNOWN = ['0_a', '1_b', '2_c', '9_d', 'm010_e', 'm011_f'];
+
+  it.each([
+    ['nothing applied', []],
+    ['an exact prefix', ['0_a', '1_b', '2_c']],
+    ['an exact prefix out of order', ['2_c', '0_a', 'm010_e', '9_d', '1_b']],
+    ['everything applied', ['m011_f', '0_a', '1_b', '2_c', '9_d', 'm010_e']],
+  ])('accepts %s', (_label, applied) => {
+    expect(migrationOrderProblem(KNOWN, applied)).toBeNull();
+  });
+
+  it('names an applied migration this build lacks', () => {
+    expect(migrationOrderProblem(KNOWN, ['0_a', '1_b', 'm099_zz'])).toBe(
+      'applied migration m099_zz is not in this build',
+    );
+  });
+
+  it('names the first unknown applied migration in name order', () => {
+    expect(migrationOrderProblem(KNOWN, ['0_a', 'm099_zz', 'm098_yy'])).toBe(
+      'applied migration m098_yy is not in this build',
+    );
+  });
+
+  it('names a gap at the very first migration', () => {
+    expect(migrationOrderProblem(KNOWN, ['1_b'])).toBe(
+      'pending migration 0_a sorts before applied migration 1_b; applied migrations must come first in name order',
+    );
+  });
+
+  it('names a pending legacy migration that sorts before an applied one', () => {
+    expect(migrationOrderProblem(KNOWN, ['0_a', '1_b', '9_d'])).toBe(
+      'pending migration 2_c sorts before applied migration 9_d; applied migrations must come first in name order',
+    );
+  });
+
+  // The last applied migration in name order, not in the order given.
+  it('names the last applied migration by name, and the first pending one', () => {
+    expect(migrationOrderProblem(KNOWN, ['m011_f', '0_a', '1_b'])).toBe(
+      'pending migration 2_c sorts before applied migration m011_f; applied migrations must come first in name order',
+    );
+  });
+
+  // Kysely runs pending migrations in plain text order. A name outside T-012's
+  // scheme can sort differently there, and would run out of turn on a fresh
+  // install or on a droid that skipped a release.
+  it.each([
+    ['nothing applied (a fresh install)', []],
+    ['a droid that skipped a release', ['0_initial', '1_b', '2_c']],
+  ])('names a misnamed migration Kysely would run out of turn: %s', (_label, applied) => {
+    expect(migrationOrderProblem(['0_initial', '1_b', '2_c', '9_d', '10_x'], applied)).toBe(
+      'Kysely would run migration 10_x before 1_b: migration names must sort the same as plain text and by number (T-012)',
+    );
+  });
+
+  it('names an unknown applied migration before a run-order problem', () => {
+    expect(migrationOrderProblem(['0_initial', '1_b', '10_x'], ['0_initial', 'm099_zz'])).toBe(
+      'applied migration m099_zz is not in this build',
+    );
+  });
+
+  // The first position can differ too: no shared first name to skip past.
+  it('names a run-order problem at the very first position', () => {
+    expect(migrationOrderProblem(['9_a', '10_x'], [])).toBe(
+      'Kysely would run migration 10_x before 9_a: migration names must sort the same as plain text and by number (T-012)',
+    );
+  });
+
+  // Whatever has been applied: with nothing pending it changes nothing in
+  // production, but the registry is still wrong.
+  it('names a run-order problem with everything applied', () => {
+    expect(migrationOrderProblem(['0_initial', '1_b', '10_x'], ['0_initial', '1_b', '10_x'])).toBe(
+      'Kysely would run migration 10_x before 1_b: migration names must sort the same as plain text and by number (T-012)',
+    );
+  });
+
+  it('checks the run order before a gap', () => {
+    expect(migrationOrderProblem(['0_initial', '1_b', '10_x'], ['0_initial', '10_x'])).toBe(
+      'Kysely would run migration 10_x before 1_b: migration names must sort the same as plain text and by number (T-012)',
+    );
+  });
+
+  // `known` may arrive in any order (a provider's key order); the gap check
+  // sorts it by name first.
+  it('accepts an exact prefix when known arrives unsorted', () => {
+    expect(migrationOrderProblem(['2_c', '0_a', '1_b'], ['1_b', '0_a'])).toBeNull();
   });
 });

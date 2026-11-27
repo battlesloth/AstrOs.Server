@@ -41,11 +41,10 @@ function compareCodeUnits(a: string, b: string): number {
 //   - from 10 on, `m<NNN>_<slug>` (m010_…), after every legacy name, by number
 //     (a plain `10_` would sort before `1_`, see T-012);
 //   - a tie on the number compares the slug, then the whole name, by UTF-16 code
-//     unit, as .sort() does. (Kysely orders *executed* migrations by timestamp
-//     and breaks same-millisecond ties, common on a fresh install, with
-//     localeCompare on the whole name. That agrees with .sort() for every valid
-//     name only while numbers are unique, which database.test.ts pins for the
-//     production registry.)
+//     unit, as .sort() does.
+// migrateToLatest also checks the applied migrations against this order
+// (migrationOrderProblem below), and turns off Kysely's own check, which
+// orders applied migrations by their recorded timestamps (T-017).
 // Multi-digit legacy names only arrive from an old sibling branch's database and
 // keep numeric order. Names matching neither pattern sort last, by localeCompare.
 // Exported so tests can derive expected ordering without duplicating the rule.
@@ -62,14 +61,61 @@ export function compareMigrationNames(a: string, b: string): number {
   return a.localeCompare(b);
 }
 
+// Null when this build's migrations can run safely: every applied migration is
+// known, Kysely's plain-text run order matches name order, and the applied
+// migrations are exactly the first ones in name order. Kysely's own check
+// orders applied migrations by their recorded clock time instead, which a
+// droid without a battery-backed clock can get wrong (T-017), so
+// migrateToLatest turns it off and runs this first. `known` is the provider's
+// names; both lists may come in any order.
+export function migrationOrderProblem(
+  known: readonly string[],
+  applied: readonly string[],
+): string | null {
+  const unknown = unknownMigrations(applied, new Set(known));
+  if (unknown.length > 0) {
+    return `applied migration ${unknown[0]} is not in this build`;
+  }
+
+  // Kysely runs pending migrations in plain .sort() order, not this one. A
+  // name outside T-012's scheme (a plain `10_x`) can sort differently there
+  // and run out of turn, on a fresh install or on a droid that skipped a
+  // release, so the two orders must agree whatever has been applied.
+  const ordered = [...known].sort(compareMigrationNames);
+  const runOrder = [...known].sort();
+  const firstDiff = runOrder.findIndex((name, i) => name !== ordered[i]);
+  if (firstDiff !== -1) {
+    return (
+      `Kysely would run migration ${runOrder[firstDiff]} before ${ordered[firstDiff]}: ` +
+      'migration names must sort the same as plain text and by number (T-012)'
+    );
+  }
+
+  const appliedSet = new Set(applied);
+  let last = -1;
+  for (let i = 0; i < ordered.length; i++) {
+    if (appliedSet.has(ordered[i])) last = i;
+  }
+  for (let i = 0; i < last; i++) {
+    if (!appliedSet.has(ordered[i])) {
+      return (
+        `pending migration ${ordered[i]} sorts before applied migration ${ordered[last]}; ` +
+        'applied migrations must come first in name order'
+      );
+    }
+  }
+  return null;
+}
+
 export async function getProviderMigrationNames(provider: MigrationProvider): Promise<string[]> {
   const map = await provider.getMigrations();
   return Object.keys(map).sort(compareMigrationNames);
 }
 
-// A fresh database has no migration table yet; that reads the same as an
-// empty one for every caller below.
-async function getAppliedMigrationNames(db: Kysely<Database>): Promise<string[]> {
+// The names in kysely_migration, in no particular order (no ORDER BY; sort by
+// compareMigrationNames, never by position). A fresh database has no migration
+// table yet; that reads the same as an empty one.
+export async function getAppliedMigrationNames(db: Kysely<Database>): Promise<string[]> {
   if (!(await migrationTableExists(db))) {
     return [];
   }
@@ -113,8 +159,9 @@ export async function getLastAppliedMigrationName(
   const appliedNames = await getAppliedMigrationNames(db);
   if (appliedNames.length === 0) return null;
 
-  // Provider order is canonical. Kysely's stored timestamp ties at ms resolution
-  // when migrations run in quick succession (e.g. fresh DBs in tests).
+  // Provider order is canonical: stored timestamps tie at ms resolution when
+  // migrations run in quick succession, and can be out of order on a droid
+  // with a wrong clock (T-017).
   const all = await getProviderMigrationNames(provider);
   const applied = new Set(appliedNames);
   for (let i = all.length - 1; i >= 0; i--) {

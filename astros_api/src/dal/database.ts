@@ -40,6 +40,8 @@ import {
   writeMigrationSentinel,
   sentinelBackupProblem,
   getProviderMigrationNames,
+  getAppliedMigrationNames,
+  migrationOrderProblem,
 } from './backup.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -54,15 +56,15 @@ export function resolveDatabaseDir(envValue: string | undefined): string {
 }
 
 // Migration names (T-012): Kysely resolves migrations in plain-string .sort()
-// order (nameComparator only breaks ties among executed migrations' timestamps),
-// so a plain `10_…` would run before `1_…`, and a database at or past 1 would
-// refuse it as "corrupted migrations". From 10 on, names are `m<NNN>_<snake_name>`
-// (m010_…, m011_…, up to m899; m9NN is for injected test migrations), which sort
-// after every legacy `<n>_` name as plain strings. Take the next number after
-// develop's highest at merge time, and use each number once: Kysely breaks
-// executed-timestamp ties with localeCompare, which disagrees with .sort() on
-// same-number names. The legacy 0_–9_ names are frozen. database.test.ts pins
-// these rules and the match with compareMigrationNames (dal/backup.ts).
+// order, so on its own it would run a plain `10_…` second on a fresh install,
+// before `1_…`. From 10 on, names are `m<NNN>_<snake_name>` (m010_…, m011_…, up
+// to m899; m9NN is for injected test migrations), which sort after every
+// legacy `<n>_` name as plain strings. Take the next number after develop's
+// highest at merge time, and use each number once (database.test.ts's guard
+// enforces it). The legacy 0_–9_ names are frozen.
+// database.test.ts pins these rules and the match with compareMigrationNames
+// (dal/backup.ts) in CI; at startup, migrateToLatest refuses a registry whose
+// plain-text order differs from name order (T-017).
 export const PRODUCTION_MIGRATIONS: Readonly<Record<string, Migration>> = Object.freeze({
   '0_initial': migration_0,
   '1_add_script_evt_id': migration_1,
@@ -465,9 +467,32 @@ export function __resetMigrationProviderForTest(): void {
 }
 
 export async function migrateToLatest(db: Kysely<Database>): Promise<void> {
+  // Kysely's own order check sorts applied migrations by the clock time it
+  // recorded for each, and a droid without a battery-backed clock can record
+  // one as older than the migration before it; every later upgrade would then
+  // refuse as "corrupted migrations" (T-017). So the order is checked here by
+  // name, and Kysely's check is turned off. Pending migrations still run in
+  // Kysely's plain .sort() order; the check also refuses a registry where that
+  // differs from name order, which Kysely's check caught only once a migration
+  // past the first was applied, and never on a fresh install.
+  //
+  // One read of the provider, shared by the check and the Migrator, so Kysely
+  // runs exactly the migrations the check validated.
+  const migrations = await activeMigrationProvider.getMigrations();
+  const provider: MigrationProvider = { getMigrations: async () => migrations };
+  const problem = migrationOrderProblem(
+    await getProviderMigrationNames(provider),
+    await getAppliedMigrationNames(db),
+  );
+  if (problem !== null) {
+    logger.error(`failed to migrate: ${problem}`);
+    throw new Error(problem);
+  }
+
   const migrator = new Migrator({
     db,
-    provider: activeMigrationProvider,
+    provider,
+    allowUnorderedMigrations: true,
   });
 
   const { error, results } = await migrator.migrateToLatest();
