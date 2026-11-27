@@ -53,8 +53,8 @@
 
 Considered and left out, because a swap doesn't compile there or because the code follows another API's convention:
 - **Functions with 5+ parameters of different types:** `flattenPlaylistTrack`, `addEventBox`, `resolveFlashSource`. Swapping two of their arguments fails to compile.
-- **PixiJS rendering helpers** (`createCircularButton`, `drawTimelineLabels`, `PixiScrollBarThumb`): positional `x, y, width, height` follows Pixi's own API, the code is checked only by hand (CLAUDE.md TDD exceptions), and each has one or two call sites.
-  - **For Jeff:** `drawTimelineTicks` (7 parameters, 5 adjacent numbers: intervals, height, width, duration, pixels per tick) is the one Pixi helper where a swap is plausible. Add it here if wanted.
+- **PixiJS rendering helpers** (`createCircularButton`, `PixiScrollBarThumb`): positional `x, y, width, height` follows Pixi's own API, the code is checked only by hand (CLAUDE.md TDD exceptions), and each has one or two call sites.
+  - `drawTimelineTicks` and `drawTimelineLabels`, first listed here as the plausible-swap case, turned out to be dead code: nothing imports their module, `timelineRendering.ts`, and the live timeline passes a `ZoomLevelConfig`. T-019 deletes the module (Jeff, 2026-11-27).
 - **`SerialMessageTracker`** (4 parameters, no adjacent same types).
 - **`PwmChannel`**: never constructed (the PCA9685 servo path is retired; the class survives in the `BaseChannel` type union). Deleting it is a separate question.
 - Any other behavior change, rename or new field.
