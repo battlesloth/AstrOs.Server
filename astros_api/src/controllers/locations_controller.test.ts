@@ -166,7 +166,13 @@ describe('Locations Controller', () => {
       expect(res.json).toHaveBeenCalledWith({
         message: 'invalid_release_ms',
         problems: [
-          'body, module "Body Maestro", board 0, channel 1: releaseMs 999 is not a whole number from 1000 to 120000',
+          {
+            code: 'RELEASE_MS_OUT_OF_RANGE',
+            location: 'body',
+            moduleIndex: 0,
+            boardIndex: 0,
+            channelIndex: 1,
+          },
         ],
       });
       expect(await fingerprints()).toEqual({
@@ -180,12 +186,11 @@ describe('Locations Controller', () => {
         { id: 'ch-1', releaseMs: 5000 },
       ]);
       expect(warnSpy).toHaveBeenCalledWith(
-        'saveLocations: refused: body, module "Body Maestro", board 0, channel 1: releaseMs 999 is not a whole number from 1000 to 120000',
+        'saveLocations: refused: body uartModules[0].boards[0].channels[1] RELEASE_MS_OUT_OF_RANGE',
       );
     });
 
-    // Each problem already contains ", ", so the log joins them with "; ".
-    it('reports every bad channel, in the reply and in one warn line', async () => {
+    it('reports every bad channel by code and position, in the reply and in one warn line', async () => {
       const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
       const sent = await locationsAsSent();
       const [ch0, ch1] = sent.bodyModule.uartModules[0].subModule.boards[0].channels;
@@ -195,14 +200,58 @@ describe('Locations Controller', () => {
 
       await saveLocations(db, { body: sent }, res, vi.fn());
 
-      const problems = [
-        'body, module "Body Maestro", board 0, channel 0: releaseMs 999 is not a whole number from 1000 to 120000',
-        'body, module "Body Maestro", board 0, channel 1: releaseMs "x" is not a whole number from 1000 to 120000',
-      ];
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ message: 'invalid_release_ms', problems });
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'invalid_release_ms',
+        problems: [
+          {
+            code: 'RELEASE_MS_OUT_OF_RANGE',
+            location: 'body',
+            moduleIndex: 0,
+            boardIndex: 0,
+            channelIndex: 0,
+          },
+          {
+            code: 'RELEASE_MS_NOT_INTEGER',
+            location: 'body',
+            moduleIndex: 0,
+            boardIndex: 0,
+            channelIndex: 1,
+          },
+        ],
+      });
       expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy).toHaveBeenCalledWith(`saveLocations: refused: ${problems.join('; ')}`);
+      expect(warnSpy).toHaveBeenCalledWith(
+        'saveLocations: refused: body uartModules[0].boards[0].channels[0] RELEASE_MS_OUT_OF_RANGE; ' +
+          'body uartModules[0].boards[0].channels[1] RELEASE_MS_NOT_INTEGER',
+      );
+    });
+
+    // The reply lists every problem; the log keeps the first 10.
+    it.each([
+      [10, ''],
+      [11, '; … and 1 more'],
+      [12, '; … and 2 more'],
+    ])('logs at most 10 of %i problems, with a count of the rest', async (count, suffix) => {
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      const sent = await locationsAsSent();
+      const board = sent.bodyModule.uartModules[0].subModule.boards[0];
+      board.channels = Array.from({ length: count }, (_, n) => ({
+        ...board.channels[0],
+        id: `ch-many-${n}`,
+        channelNumber: n,
+        releaseMs: 1,
+      }));
+      const res = mockRes();
+
+      await saveLocations(db, { body: sent }, res, vi.fn());
+
+      expect((res.json.mock.calls[0][0] as { problems: unknown[] }).problems).toHaveLength(count);
+      const logged = Array.from(
+        { length: 10 },
+        (_, n) => `body uartModules[0].boards[0].channels[${n}] RELEASE_MS_OUT_OF_RANGE`,
+      );
+      expect(warnSpy).toHaveBeenCalledWith(`saveLocations: refused: ${logged.join('; ')}${suffix}`);
     });
 
     it('saves a valid releaseMs', async () => {

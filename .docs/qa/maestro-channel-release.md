@@ -94,14 +94,22 @@ const channels = (c) => c.bodyModule.uartModules.find((m) => m.moduleSubType ===
    already have): `sqlite3 $DB "UPDATE locations SET config_fingerprint = 'qa-marker'"`.
    Then
    `const c = await load(); channels(c)[0].releaseMs = 20000; channels(c)[1].releaseMs = 999; await save(c);`.
-   Expected: `400 { message: 'invalid_release_ms', problems: ['body, module "<name>", board 0, channel 1: releaseMs 999 is not a whole number from 1000 to 120000'] }`;
-   the API log has a warn entry whose `msg` starts `saveLocations: refused:`;
+   Expected, with `m = c.bodyModule.uartModules.findIndex((x) => x.moduleSubType === 104)`:
+   `400 { message: 'invalid_release_ms', problems: [{ code: 'RELEASE_MS_OUT_OF_RANGE', location: 'body', moduleIndex: m, boardIndex: 0, channelIndex: 1 }] }`;
+   the API log has a warn entry whose `msg` is
+   `saveLocations: refused: body uartModules[m].boards[0].channels[1] RELEASE_MS_OUT_OF_RANGE`;
    channel 0 is not 20000, and every row of
    `sqlite3 $DB "SELECT name, config_fingerprint FROM locations"` still reads
    `qa-marker` (no location was written).
-10. **Each refused form.** Repeat case 9 with `120001`, `1500.5`, `'5000'`
-    (a string) and `null` on channel 1. Expected: a `400` each time, naming the
-    value (`"5000"` in quotes for the string).
+10. **Each refused form.** Repeat case 9 with `120001` on channel 1. Expected:
+    `RELEASE_MS_OUT_OF_RANGE`. Then with `1500.5`, `'5000'` (a string) and
+    `null`. Expected: `RELEASE_MS_NOT_INTEGER` each time.
+    - **Nothing from the request comes back.**
+      `const d = await load(); d.bodyModule.uartModules.find((m) => m.moduleSubType === 104).name = 'x'.repeat(5000); channels(d).forEach((ch) => (ch.releaseMs = 1)); await save(d);`
+      (every channel of the board bad; a board has 24). Expected: a `400` whose
+      `problems` holds 24 entries of codes and positions only (the reply has no
+      run of `x`s, such as `xxxx`, and is a few KB); the API log's warn entry
+      lists the first 10, then `… and 14 more`, as one short line.
 11. **Sync is unchanged (until T-014).** With a controller connected, click
     **Sync**. Expected: the success toast, and the controller's Maestro servos
     still respond to the servo test. The config string keeps 7 fields per

@@ -23,7 +23,13 @@
   - New `astros_vue/src/constants/maestro.ts` mirrors the three constants, with a "keep in sync" note, as `constants/firmware.ts` does.
   - New channels (`composables/useModuleManagement.ts`) get `RELEASE_MS_DEFAULT`.
 - **`PUT /api/locations/` (`saveLocations`):**
-  - A Maestro channel whose `releaseMs` is **present** but not an integer in [1000, 120000] is refused **before any write**: `400 { message: 'invalid_release_ms', problems: string[] }`. Each problem names the location, the channel number and the bad value.
+  - A Maestro channel whose `releaseMs` is **present** but not an integer in [1000, 120000] is refused **before any write**: `400 { message: 'invalid_release_ms', problems: ReleaseMsProblemEntry[] }`.
+  - **Contract amendment (Jeff, 2026-11-27, PR #141 review): codes and positions, not strings.** This first read `problems: string[]`, each naming the location, the channel number and the bad value. Each problem is now `{ code, location, moduleIndex, boardIndex, channelIndex }`:
+    - `code` is the `ReleaseMsProblem` enum: `RELEASE_MS_NOT_INTEGER` (not a finite whole number) or `RELEASE_MS_OUT_OF_RANGE` (a whole number outside 1000–120000);
+    - `location` is the location's name;
+    - the three indexes are the channel's positions in the request's `uartModules`, `subModule.boards` and `channels` arrays.
+    - Nothing from the request is echoed, so a problem has a fixed size.
+    - The Vue side maps each code to a message (T-015).
   - An **absent** (`undefined`) `releaseMs` is stored as 5000, so a stale browser tab can still save.
   - Every other response is unchanged.
 - **Unchanged here:** the config sync string, `MINIMUM_FIRMWARE_VERSION`, the Vue UI (T-014 and T-015).
@@ -39,7 +45,7 @@
   - `loadMaestroModule` and `readMaestroChannel`
   - the API model
   - every `new MaestroChannel(` call site, tests included (`message_generator.test.ts`, `script_repository.test.ts`, `uart_repository.test.ts`, `script_converter*.test.ts`), and the smoke test's bench fixture `astros_smoke_test/src/core/fixtures/demo-location.ts`, which imports the API model (added by the pre-push review)
-- **Validator:** a pure `findInvalidReleaseMs(body: unknown): string[]` in `release_ms.ts` (amended, Jeff, 2026-11-26: first `(collection: LocationCollection)`; the body is untrusted JSON, so the parameter says so). `saveLocations` calls it first and answers 400 on any problem.
+- **Validator:** a pure `findInvalidReleaseMs(body: unknown): ReleaseMsProblemEntry[]` (amended 2026-11-27, above; first `string[]`) in `release_ms.ts` (amended, Jeff, 2026-11-26: first `(collection: LocationCollection)`; the body is untrusted JSON, so the parameter says so). `saveLocations` calls it first and answers 400 on any problem.
 - **Vue:** the model field, the constants file, and the new-channel default. Fix the type errors the new field raises in stories, specs and fixtures.
 
 ## Acceptance criteria
@@ -75,7 +81,7 @@
 No failure-mode inventory: an additive column and a pure validator. On an upgrade, an interrupted `m010` run is T-016's restore path, and `up` then runs on the old table. A fresh install's first boot takes no backup, so the next boot backs up the half-migrated file and runs `up` on a table that already has the column; `up` skips the `ALTER` then (as `migration_9` does). Without that, that boot and every later one would fail on the duplicate column.
 
 - [x] RED → GREEN: `m010_add_maestro_release_ms` (`m010_add_maestro_release_ms.test.ts`, after `migration_9.test.ts`): `INTEGER NOT NULL DEFAULT 5000` (a frozen literal, not `RELEASE_MS_DEFAULT`); a pre-existing row reads 5000; an insert without the column gets 5000; `up` is a no-op when the column exists but the migration is unrecorded (mutation: the guard dropped → "duplicate column"); `down` drops it. Registered in `PRODUCTION_MIGRATIONS` and `migrations/index.ts`; runs right after `9_` on a fresh database (Kysely's run order), with `database.test.ts`'s name guard green
-- [x] RED → GREEN: `release_ms.ts` constants and `findInvalidReleaseMs` (`release_ms.test.ts`): flags 999, 120001, 1500.5, `NaN`, `"5000"`, `null`, `Infinity`, 0, `true`; accepts 1000, 5000, 120000; ignores an absent value; checks only Maestro UART modules; each problem names the location, the module, the board, the channel number and the value; a malformed body or a value whose `String()` throws doesn't throw. Mutations caught: the absent check, the sub-type filter, `String()` for the value, either bound exclusive, `typeof number` for the integer check, a coerced string
+- [x] RED → GREEN: `release_ms.ts` constants and `findInvalidReleaseMs` (`release_ms.test.ts`): flags 999, 120001, 1500.5, `NaN`, `"5000"`, `null`, `Infinity`, 0, `true`; accepts 1000, 5000, 120000; ignores an absent value; checks only Maestro UART modules; each problem names the location, the module, the board, the channel number and the value (superseded 2026-11-27: codes and positions; see the PR #141 review); a malformed body or a value whose `String()` throws doesn't throw. Mutations caught: the absent check, the sub-type filter, `String()` for the value, either bound exclusive, `typeof number` for the integer check, a coerced string
 - [x] API model: `releaseMs` as the last `MaestroChannel` constructor parameter; every `new MaestroChannel(` call site, tests included, and the smoke test's fixture (missed until the pre-push review); `release_ms` a plain `number` in `MaestroChannelTable`, so an insert without it fails `tsc`
 - [x] RED → GREEN: repository round-trip (`uart_repository.test.ts`): 15000 → 15000; absent → 5000; `null` → 5000; a later save replaces it (`excluded.release_ms`), and one without it resets it to 5000; `readMaestroChannel` returns it. Mutations caught: the update clause, the `??` fallback (at first only by the `null` case, since Kysely drops `undefined` keys and the column default covers absent; since the pre-push fix pass's throw, by the absent cases too)
 - [x] RED → GREEN: `PUT /api/locations/` (`locations_controller.test.ts`, `saveLocations` exported): a good dome change plus one bad body channel → 400 `{ message: 'invalid_release_ms', problems }` with a `warn`, and nothing written (every fingerprint, dome's modules and the body channels unchanged); a valid value saves; an absent `releaseMs` → 200 and 5000. Mutations caught: the validation moved after the first `updateLocation`, the `return` after the 400 dropped
@@ -93,7 +99,7 @@ No failure-mode inventory: an additive column and a pure validator. On an upgrad
 - **Important:** QA case 5 expected a success toast; the Modules page's Save shows none (the "Saving..." dialog just closes).
 - **Minors:** "firmware before 1.3.0" for the 5 s floor (1.2.0 used a position counter; the floor is 1.2.1–1.2.2, ESP T-005); the QA plan's SQL-range warning, `$DB` setup, case 6's hidden settings and over-broad `UPDATE`, case 7's scope, a case 11 claim citing this one-time Verification, and a new case 12 (an older build refuses the database); "fails as before (500)" for a malformed body (an empty body answers 200); an unrestored `logger.warn` spy; the string case's test title; `describe` renamed `formatValue`; `RELEASE_MS_MIN`/`MAX` dropped from the `models/index.ts` barrel (nothing imports them); a stale "before any real m-migration exists" comment in `database.test.ts`.
 
-**Declined (pinned or out of scope):** a stale tab resets a custom value to 5000, and the `problems` strings are English (both Contract); the Vue save path drops `problems` and shows the axios message, and the components' local `MaestroChannel` interfaces lack the field (both now in T-015's Task); no `CHECK` constraint. A test tying the Vue constants to the API's, declined here, was added in the pre-push fix pass.
+**Declined (pinned or out of scope):** a stale tab resets a custom value to 5000 (Contract), and the `problems` strings are English (Contract then; replaced by codes in the PR #141 review); the Vue save path drops `problems` and shows the axios message, and the components' local `MaestroChannel` interfaces lack the field (both now in T-015's Task); no `CHECK` constraint. A test tying the Vue constants to the API's, declined here, was added in the pre-push fix pass.
 
 **Verification step corrected:** it first named `GET /api/locations/`, which carries no modules; the Modules page loads from `/api/locations/load`.
 
@@ -120,7 +126,7 @@ No failure-mode inventory: an additive column and a pure validator. On an upgrad
 - **A `releaseMsOrDefault` helper:** the throw already makes the fallback load-bearing.
 - **Contract notes, decided by Jeff (2026-11-26):**
   - `findInvalidReleaseMs(body: unknown)` is taken here (the Task line above).
-  - A structured list of the refused channels is pinned in T-015's Contract.
+  - A structured list of the refused channels is pinned in T-015's Contract (superseded 2026-11-27: T-013's own `problems` became that list; see the PR #141 review).
   - The 11-parameter constructor goes to T-018 (`.docs/tasks/T-018-named-constructor-fields.md`), a post-release refactor to named fields across the app.
 
 **Review of the pre-push fix pass (2026-11-26, fresh-context reviewer):** no Critical or Important findings and no production bug. The throw can't fire on today's only write path, the warn doesn't fire for a current client, and the read default's read-only claim holds. Fixed:
@@ -138,3 +144,33 @@ No failure-mode inventory: an additive column and a pure validator. On an upgrad
   - The refusal test checks all three tables and drops a dead spy.
   - This file's drift is fixed.
 - **Mutations:** 4 more run (the boards `break`, a warn for only the first board, the value dropped from the throw, the old `catch` text), all caught by a test.
+
+**PR #141 review (2026-11-27, Copilot):** one finding, real.
+- **The problem:** every problem quoted its module's name in full, so a long name across many channels amplified the refusal. Reproduced against the built validator: a 39.8 KB request with a 20,000-character name and 576 bad channels gave an 11.0 MB 400 reply and an 11.0 MB `warn` line.
+- **First fix (superseded, never committed):** each quoted value was cut to 64 characters, and the log was capped. The reviewer measured the result: a crafted 100 kB body could still get a reply of about 4 MB. That fix also leaned on `?? 'undefined'` to stop a 500, and it would have needed a matching length rule in T-015's pinned list.
+- **The fix (Jeff, 2026-11-27): an enumeration as the error code, not strings.** This is the Contract amendment above.
+  - `releaseMsProblem(value): ReleaseMsProblem | null` classifies a value using only `Number.isInteger` and comparisons, so nothing can make it throw. The route and the repository's refusal (`… channel <id>: <code>`) share it.
+  - `findInvalidReleaseMs` returns `{ code, location, moduleIndex, boardIndex, channelIndex }` entries (Jeff: positions, two codes). Nothing from the request comes back, and an entry is under 120 bytes. The worst case measured by the review: a 96 kB body of `{"releaseMs":0}` channels gets a 623 kB reply (6.5×, against the superseded fix's 40×).
+  - The `warn` line is built from codes and positions, `body uartModules[0].boards[0].channels[3] RELEASE_MS_OUT_OF_RANGE`, for the first 10 problems, then `… and <n> more`. The reply keeps every problem.
+  - `formatJsonValue` and `isValidReleaseMs` are gone.
+- **Tests and mutations:**
+  - a code for each value class, including values whose `String()` throws, a cycle and deep nesting;
+  - positions that count every UART module and use array indexes, not `boardId` or `channelNumber`;
+  - no request text in the reply, and a fixed size per entry;
+  - the 10/11/12 log boundary.
+  - Mutations caught, 11 of 11: the codes swapped, either bound exclusive, a looser integer check, a Maestro-only module index, `channelNumber` or `boardId` as an index, the absent check dropped, logging every problem, the suffix at exactly 10, and the repository refusal dropped.
+- **Swept:**
+  - T-015's pinned `invalid` list is dropped, because `problems` is now that list. T-015 adds the Vue enum mirror and a message per code.
+  - QA cases 9, 10 and 10a.
+  - The earlier "Declined" line about English `problems`, which no longer applies.
+- Jeff, 2026-11-27: this is a deep edge case, since the T-015 form keeps a real save from sending a bad value.
+- **Review of the enum change (fresh-context reviewer):** no Critical findings; the code matches the amended Contract.
+  - It confirmed that positions count every entry, that no request text reaches the reply or its log, and the classification table (including `1e21` → out of range and Infinity → not an integer).
+  - Fixed:
+    - QA 10a expected "no `x`" though the keys contain one, so it now reads "no run of `x`s"; it is also a sub-item of case 10;
+    - a test-title format string printed "classifies 999 as 999";
+    - these notes' superseded claims;
+    - two overclaiming comments;
+    - the dead `ReleaseMsProblem` barrel export.
+  - New test: a `null` or non-object entry before a bad one, at each level. Mutation: filtering entries before indexing them, at each level, is caught.
+  - Not changed: the repository's refusal and per-board warn still name a channel or board id once each. `saveLocations` can't reach the refusal, and neither is an amplification.

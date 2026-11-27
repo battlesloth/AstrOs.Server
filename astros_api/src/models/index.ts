@@ -18,12 +18,10 @@ export type { MaestroBoard } from './control_module/uart/sub_modules/maestro/mae
 export { MaestroChannel } from './control_module/uart/sub_modules/maestro/maestro_channel.js';
 export {
   RELEASE_MS_DEFAULT,
-  RELEASE_MS_MIN,
-  RELEASE_MS_MAX,
   findInvalidReleaseMs,
-  formatJsonValue,
-  isValidReleaseMs,
+  releaseMsProblem,
 } from './control_module/uart/sub_modules/maestro/release_ms.js';
+export type { ReleaseMsProblemEntry } from './control_module/uart/sub_modules/maestro/release_ms.js';
 export type { PwmModule } from './control_module/i2c/sub_modules/pca9685/pwm_module.js';
 export { PwmChannel } from './control_module/i2c/sub_modules/pca9685/pwm_channel.js';
 export { UartModule, getUartScriptResources } from './control_module/uart/uart_module.js';

@@ -461,13 +461,13 @@ describe('UartRepository', () => {
     // saveLocations refuses a bad value first; a caller that skips it must not
     // store one (INTEGER affinity keeps 1500.5 as REAL and 'abc' as TEXT).
     it.each([
-      [999, '999'],
-      [1500.5, '1500.5'],
-      ['5000', '"5000"'],
-      ['abc', '"abc"'],
-    ])('refuses to store releaseMs %j, writing nothing', async (bad, shown) => {
+      [999, 'RELEASE_MS_OUT_OF_RANGE'],
+      [1500.5, 'RELEASE_MS_NOT_INTEGER'],
+      ['5000', 'RELEASE_MS_NOT_INTEGER'],
+      ['abc', 'RELEASE_MS_NOT_INTEGER'],
+    ])('refuses to store releaseMs %j (%s), writing nothing', async (bad, code) => {
       await expect(save(maestroWith('m1', [5000, bad as number]))).rejects.toThrow(
-        `UartRepository.upsertMaestroModule: channel m1-ch1 has releaseMs ${shown}, not a whole number from 1000 to 120000`,
+        `UartRepository.upsertMaestroModule: channel m1-ch1: ${code}`,
       );
 
       for (const table of ['uart_modules', 'maestro_boards', 'maestro_channels'] as const) {

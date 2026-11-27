@@ -1,13 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { findInvalidReleaseMs, RELEASE_MS_DEFAULT } from './release_ms.js';
+import {
+  findInvalidReleaseMs,
+  releaseMsProblem,
+  ReleaseMsProblem,
+  RELEASE_MS_DEFAULT,
+} from './release_ms.js';
 
 const ABSENT = Symbol('absent');
 
 // Plain objects, as `PUT /api/locations/` receives them from JSON. 104 is
 // ModuleSubType.maestro and 102 ModuleSubType.kangaroo, written as literals so
 // a renumbered enum can't move both sides of the test together.
-// Board ids start at 2 and channel numbers at 4, so a problem built from array
-// positions instead of `boardId` and `channelNumber` can't match.
+// Board ids start at 2 and channel numbers at 4, so a position taken from
+// `boardId` or `channelNumber` instead of the array index can't match.
 function board(releaseMs: unknown[], boardId = 2) {
   return {
     id: `board-${boardId}`,
@@ -31,9 +36,6 @@ function maestroModule(name: string, releaseMs: unknown[], extra: Record<string,
   };
 }
 
-const problem = (where: string, value: string) =>
-  `${where}: releaseMs ${value} is not a whole number from 1000 to 120000`;
-
 // The keys stay checked, so a typo can't make a test pass by being ignored.
 function collection(parts: Partial<Record<'domeModule' | 'coreModule' | 'bodyModule', unknown>>) {
   return parts;
@@ -43,22 +45,59 @@ function domeWith(...releaseMs: unknown[]) {
   return collection({ domeModule: { uartModules: [maestroModule('Dome Maestro', releaseMs)] } });
 }
 
-describe('findInvalidReleaseMs', () => {
-  // The first column is the value as the problem shows it, so the string
-  // case's title reads "flags "5000"", not "flags 5000".
+const at = (
+  location: string,
+  moduleIndex: number,
+  boardIndex: number,
+  channelIndex: number,
+  code: ReleaseMsProblem,
+) => ({ code, location, moduleIndex, boardIndex, channelIndex });
+
+const cyclic: unknown[] = [];
+cyclic.push(cyclic);
+
+describe('releaseMsProblem', () => {
   it.each([
-    ['999', 999],
-    ['120001', 120001],
-    ['1500.5', 1500.5],
-    ['NaN', NaN],
-    ['"5000"', '5000'],
-    ['null', null],
-    ['Infinity', Infinity],
-    ['0', 0],
-    ['true', true],
-  ])('flags %s, naming the location, module, board, channel and value', (shown, value) => {
-    expect(findInvalidReleaseMs(domeWith(5000, value))).toEqual([
-      problem('dome, module "Dome Maestro", board 2, channel 5', shown),
+    ['999', 'RELEASE_MS_OUT_OF_RANGE', 999],
+    ['120001', 'RELEASE_MS_OUT_OF_RANGE', 120001],
+    ['0', 'RELEASE_MS_OUT_OF_RANGE', 0],
+    ['-5000', 'RELEASE_MS_OUT_OF_RANGE', -5000],
+    ['1500.5', 'RELEASE_MS_NOT_INTEGER', 1500.5],
+    ['NaN', 'RELEASE_MS_NOT_INTEGER', NaN],
+    ['Infinity', 'RELEASE_MS_NOT_INTEGER', Infinity],
+    ['the string "5000"', 'RELEASE_MS_NOT_INTEGER', '5000'],
+    ['null', 'RELEASE_MS_NOT_INTEGER', null],
+    ['true', 'RELEASE_MS_NOT_INTEGER', true],
+    ['undefined', 'RELEASE_MS_NOT_INTEGER', undefined],
+  ])('classifies %s as %s', (_label, code, value) => {
+    expect(releaseMsProblem(value)).toBe(code);
+  });
+
+  // Values whose String() or JSON.stringify would throw: the classification
+  // reads neither, so a refusal stays a 400.
+  it.each([
+    ['{"toString":0,"valueOf":0}', { toString: 0, valueOf: 0 }],
+    ['a cycle', cyclic],
+    ['deep nesting', JSON.parse('['.repeat(20000) + ']'.repeat(20000))],
+  ])('classifies %s as not an integer, without throwing', (_label, value) => {
+    expect(releaseMsProblem(value)).toBe(ReleaseMsProblem.NotInteger);
+  });
+
+  it.each([
+    ['1000', 1000],
+    ['5000', 5000],
+    ['120000', 120000],
+    ['RELEASE_MS_DEFAULT', RELEASE_MS_DEFAULT],
+  ])('accepts %s', (_label, value) => {
+    expect(releaseMsProblem(value)).toBeNull();
+  });
+});
+
+describe('findInvalidReleaseMs', () => {
+  it('reports a bad channel by its code and position', () => {
+    expect(findInvalidReleaseMs(domeWith(5000, 999, '5000'))).toEqual([
+      at('dome', 0, 0, 1, ReleaseMsProblem.OutOfRange),
+      at('dome', 0, 0, 2, ReleaseMsProblem.NotInteger),
     ]);
   });
 
@@ -86,10 +125,10 @@ describe('findInvalidReleaseMs', () => {
     );
 
     expect(problems).toEqual([
-      problem('dome, module "Dome Maestro", board 2, channel 4', '1'),
-      problem('dome, module "Dome Maestro", board 2, channel 6', '2'),
-      problem('core, module "Core Maestro", board 2, channel 6', '"x"'),
-      problem('body, module "Body Maestro", board 2, channel 4', '999'),
+      at('dome', 0, 0, 0, ReleaseMsProblem.OutOfRange),
+      at('dome', 0, 0, 2, ReleaseMsProblem.OutOfRange),
+      at('core', 0, 0, 2, ReleaseMsProblem.NotInteger),
+      at('body', 0, 0, 0, ReleaseMsProblem.OutOfRange),
     ]);
   });
 
@@ -106,11 +145,12 @@ describe('findInvalidReleaseMs', () => {
           bodyModule: { uartModules: [maestroModule('Body Maestro', [999])] },
         }),
       ),
-    ).toEqual([problem('body, module "Body Maestro", board 2, channel 4', '999')]);
+    ).toEqual([at('body', 0, 0, 0, ReleaseMsProblem.OutOfRange)]);
   });
 
-  // A droid with a Kangaroo drive and a Maestro is a real setup.
-  it('checks a Maestro module that follows another UART module', () => {
+  // A droid with a Kangaroo drive and a Maestro is a real setup. The module's
+  // position counts every UART module, so Vue can index what it sent.
+  it('checks a Maestro module that follows another UART module, at its own position', () => {
     const kangaroo = maestroModule('Kangaroo', [5000], { moduleSubType: 102 });
 
     expect(
@@ -119,7 +159,20 @@ describe('findInvalidReleaseMs', () => {
           domeModule: { uartModules: [kangaroo, maestroModule('Dome Maestro', [999])] },
         }),
       ),
-    ).toEqual([problem('dome, module "Dome Maestro", board 2, channel 4', '999')]);
+    ).toEqual([at('dome', 1, 0, 0, ReleaseMsProblem.OutOfRange)]);
+  });
+
+  // A null or non-object entry keeps its place, so a position counts every
+  // entry the client sent, at each of the three levels.
+  it('counts a null entry before a bad one, at each level', () => {
+    const nullFirst = maestroModule('Dome Maestro', [5000]);
+    nullFirst.subModule.boards.unshift(null as unknown as ReturnType<typeof board>);
+    nullFirst.subModule.boards[1].channels.unshift(null as never, 7 as never);
+    nullFirst.subModule.boards[1].channels.push({ id: 'bad', channelNumber: 9, releaseMs: 999 });
+
+    expect(
+      findInvalidReleaseMs(collection({ domeModule: { uartModules: [null, 'x', nullFirst] } })),
+    ).toEqual([at('dome', 2, 1, 3, ReleaseMsProblem.OutOfRange)]);
   });
 
   it('checks every Maestro module in a location', () => {
@@ -131,7 +184,7 @@ describe('findInvalidReleaseMs', () => {
           },
         }),
       ),
-    ).toEqual([problem('dome, module "Second", board 2, channel 4', '999')]);
+    ).toEqual([at('dome', 1, 0, 0, ReleaseMsProblem.OutOfRange)]);
   });
 
   it('checks a Maestro module that follows one without boards', () => {
@@ -143,7 +196,7 @@ describe('findInvalidReleaseMs', () => {
           domeModule: { uartModules: [noBoards, maestroModule('Dome Maestro', [999])] },
         }),
       ),
-    ).toEqual([problem('dome, module "Dome Maestro", board 2, channel 4', '999')]);
+    ).toEqual([at('dome', 1, 0, 0, ReleaseMsProblem.OutOfRange)]);
   });
 
   it('checks the boards after one without channels', () => {
@@ -152,7 +205,7 @@ describe('findInvalidReleaseMs', () => {
     mod.subModule.boards.push(board([999], 3));
 
     expect(findInvalidReleaseMs(collection({ domeModule: { uartModules: [mod] } }))).toEqual([
-      problem('dome, module "Dome Maestro", board 3, channel 4', '999'),
+      at('dome', 0, 2, 0, ReleaseMsProblem.OutOfRange),
     ]);
   });
 
@@ -161,7 +214,7 @@ describe('findInvalidReleaseMs', () => {
     mod.subModule.boards.push(board([5000, 999], 3));
 
     expect(findInvalidReleaseMs(collection({ domeModule: { uartModules: [mod] } }))).toEqual([
-      problem('dome, module "Dome Maestro", board 3, channel 5', '999'),
+      at('dome', 0, 1, 1, ReleaseMsProblem.OutOfRange),
     ]);
   });
 
@@ -175,43 +228,25 @@ describe('findInvalidReleaseMs', () => {
     );
   });
 
-  // String() throws on this JSON-parsable value; a refusal must stay a 400.
-  it('describes a value whose string conversion throws', () => {
-    expect(findInvalidReleaseMs(domeWith({ toString: 0, valueOf: 0 }))).toEqual([
-      problem('dome, module "Dome Maestro", board 2, channel 4', '{"toString":0,"valueOf":0}'),
-    ]);
-  });
+  // Nothing from the request comes back: a long name repeated across many
+  // channels made an 11 MB reply when problems quoted it (PR #141 review).
+  it('echoes nothing from the request, so the reply has a fixed size per problem', () => {
+    const problems = findInvalidReleaseMs(
+      collection({
+        domeModule: {
+          uartModules: [maestroModule('x'.repeat(20000), Array(576).fill('y'.repeat(100)))],
+        },
+      }),
+    );
 
-  // A cycle makes JSON.stringify throw on every Node version; the refusal
-  // must stay a 400, not a 500.
-  it('describes a value JSON.stringify cannot print', () => {
-    const cyclic: unknown[] = [];
-    cyclic.push(cyclic);
-
-    expect(findInvalidReleaseMs(domeWith(cyclic))).toEqual([
-      problem('dome, module "Dome Maestro", board 2, channel 4', '(unprintable object)'),
-    ]);
-  });
-
-  // Deep nesting that fits inside express.json's 100 kB limit overflows the
-  // stack in JSON.stringify on today's Node; whatever it prints, the walk must
-  // not throw.
-  it('does not throw on a deeply nested value', () => {
-    const deep = JSON.parse('['.repeat(20000) + ']'.repeat(20000));
-
-    expect(findInvalidReleaseMs(domeWith(deep))).toHaveLength(1);
-  });
-
-  // Characterization: `${undefined}` prints "undefined" with or without
-  // formatJsonValue's `?? 'undefined'`, which is there for its `string` type.
-  it('names a module or channel that is missing its name or number', () => {
-    const mod = maestroModule('x', [999]);
-    delete (mod as { name?: string }).name;
-    delete (mod.subModule.boards[0].channels[0] as { channelNumber?: number }).channelNumber;
-
-    expect(findInvalidReleaseMs(collection({ domeModule: { uartModules: [mod] } }))).toEqual([
-      problem('dome, module undefined, board 2, channel undefined', '999'),
-    ]);
+    expect(problems).toHaveLength(576);
+    expect(problems[575]).toEqual(at('dome', 0, 0, 575, ReleaseMsProblem.NotInteger));
+    const text = JSON.stringify(problems);
+    expect(text).not.toMatch(/xx|yy/);
+    // The size depends only on the indexes, not on what the request held.
+    const longest = JSON.stringify(problems[575]).length;
+    expect(Math.max(...problems.map((p) => JSON.stringify(p).length))).toBe(longest);
+    expect(longest).toBeLessThan(120);
   });
 
   // A malformed body is left for the repository to handle (or fail on); the

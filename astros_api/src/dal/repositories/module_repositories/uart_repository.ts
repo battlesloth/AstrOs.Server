@@ -7,10 +7,7 @@ import {
   MaestroChannel,
   ModuleSubType,
   RELEASE_MS_DEFAULT,
-  RELEASE_MS_MAX,
-  RELEASE_MS_MIN,
-  formatJsonValue,
-  isValidReleaseMs,
+  releaseMsProblem,
   UartModule,
   UartChannel,
 } from 'src/models/index.js';
@@ -306,11 +303,9 @@ async function upsertMaestroModule(
         withoutReleaseMs++;
       }
       const releaseMs = channel.releaseMs ?? RELEASE_MS_DEFAULT;
-      if (!isValidReleaseMs(releaseMs)) {
-        throw new Error(
-          `UartRepository.upsertMaestroModule: channel ${channel.id} has releaseMs ` +
-            `${formatJsonValue(releaseMs)}, not a whole number from ${RELEASE_MS_MIN} to ${RELEASE_MS_MAX}`,
-        );
+      const problem = releaseMsProblem(releaseMs);
+      if (problem !== null) {
+        throw new Error(`UartRepository.upsertMaestroModule: channel ${channel.id}: ${problem}`);
       }
 
       await trx
