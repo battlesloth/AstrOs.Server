@@ -1,6 +1,6 @@
 # T-013: Store a release time for each Maestro channel
 
-<!-- File: .docs/tasks/T-013-maestro-release-ms.md. Branch: feature/T-013-maestro-release-ms. PR title: "T-013: Store a release time for each Maestro channel". -->
+<!-- File: .docs/tasks/completed/T-013-maestro-release-ms.md. Branch: feature/T-013-maestro-release-ms. PR title: "T-013: Store a release time for each Maestro channel". -->
 
 ## Context
 
@@ -90,7 +90,7 @@ No failure-mode inventory: an additive column and a pure validator. On an upgrad
 - [x] Pre-commit: api prettier + lint, build, vitest; vue format + lint, build, vitest; code review (Review notes)
 - [x] Verification by hand on a copy of the dev database, at migration 8 (2026-11-26): the built `dist/` booted with serial skipped and driven over HTTP. The first boot backed up as `…backup-8_fix_script_duration_units`, then ran `9_` and `m010_`; `/locations/load` showed all 24 Maestro channels at 5000; an unchanged save kept them; one set to 15000 persisted; a save without the field reset it to 5000; a `"5000"` string plus a valid 20000 on another channel of the same module answered the 400 and stored neither. (The fingerprints were already `outofdate` from the earlier saves, so they showed nothing; the cross-location no-partial-write case is the unit test's.) The sync step ran the built generator on every location: 24 Maestro entries, all 7 fields. A second boot ran nothing and took no backup; the dev database's sha256 is unchanged
 - [x] Pre-push `/pr-review-toolkit:review-pr` (5 agents) and its fix pass (Review notes)
-- [ ] PLAN.md close-out at merge
+- [x] PLAN.md close-out at merge (2026-11-27; merged PR #141; `develop` green after it: API 1423/1423)
 
 ## Review notes
 

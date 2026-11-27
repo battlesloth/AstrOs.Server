@@ -1,6 +1,6 @@
 # T-017: Check migration order by name, not by the clock
 
-<!-- File: .docs/tasks/T-017-migration-order-by-name.md. Branch: feature/T-017-migration-order-by-name. PR title: "T-017: Check migration order by name, not by the clock". -->
+<!-- File: .docs/tasks/completed/T-017-migration-order-by-name.md. Branch: feature/T-017-migration-order-by-name. PR title: "T-017: Check migration order by name, not by the clock". -->
 
 ## Context
 
@@ -122,7 +122,7 @@
   - **This branch's build:** backup named for 8, `migration "9_add_script_event_end_time" was executed successfully`, not read-only. A second boot did nothing.
   - The 2099 row was left as it was, and the dev database's sha256 is unchanged.
 - [x] Pre-push `/pr-review-toolkit:review-pr` (5 agents) and its fix pass (Review notes)
-- [ ] PLAN.md close-out at merge
+- [x] PLAN.md close-out at merge (2026-11-27; merged PR #142; `develop` green after both merges: API 1423/1423)
 
 ## Review notes
 
