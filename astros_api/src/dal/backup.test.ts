@@ -1119,6 +1119,21 @@ describe('migrationOrderProblem', () => {
     );
   });
 
+  // The first position can differ too: no shared first name to skip past.
+  it('names a run-order problem at the very first position', () => {
+    expect(migrationOrderProblem(['9_a', '10_x'], [])).toBe(
+      'Kysely would run migration 10_x before 9_a: migration names must sort the same as plain text and by number (T-012)',
+    );
+  });
+
+  // Whatever has been applied: with nothing pending it changes nothing in
+  // production, but the registry is still wrong.
+  it('names a run-order problem with everything applied', () => {
+    expect(migrationOrderProblem(['0_initial', '1_b', '10_x'], ['0_initial', '1_b', '10_x'])).toBe(
+      'Kysely would run migration 10_x before 1_b: migration names must sort the same as plain text and by number (T-012)',
+    );
+  });
+
   it('checks the run order before a gap', () => {
     expect(migrationOrderProblem(['0_initial', '1_b', '10_x'], ['0_initial', '10_x'])).toBe(
       'Kysely would run migration 10_x before 1_b: migration names must sort the same as plain text and by number (T-012)',

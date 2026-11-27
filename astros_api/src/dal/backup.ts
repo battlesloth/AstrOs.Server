@@ -112,8 +112,9 @@ export async function getProviderMigrationNames(provider: MigrationProvider): Pr
   return Object.keys(map).sort(compareMigrationNames);
 }
 
-// A fresh database has no migration table yet; that reads the same as an
-// empty one for every caller below.
+// The names in kysely_migration, in no particular order (no ORDER BY; sort by
+// compareMigrationNames, never by position). A fresh database has no migration
+// table yet; that reads the same as an empty one.
 export async function getAppliedMigrationNames(db: Kysely<Database>): Promise<string[]> {
   if (!(await migrationTableExists(db))) {
     return [];
@@ -158,8 +159,9 @@ export async function getLastAppliedMigrationName(
   const appliedNames = await getAppliedMigrationNames(db);
   if (appliedNames.length === 0) return null;
 
-  // Provider order is canonical. Kysely's stored timestamp ties at ms resolution
-  // when migrations run in quick succession (e.g. fresh DBs in tests).
+  // Provider order is canonical: stored timestamps tie at ms resolution when
+  // migrations run in quick succession, and can be out of order on a droid
+  // with a wrong clock (T-017).
   const all = await getProviderMigrationNames(provider);
   const applied = new Set(appliedNames);
   for (let i = all.length - 1; i >= 0; i--) {

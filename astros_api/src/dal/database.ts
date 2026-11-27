@@ -56,11 +56,12 @@ export function resolveDatabaseDir(envValue: string | undefined): string {
 }
 
 // Migration names (T-012): Kysely resolves migrations in plain-string .sort()
-// order, so a plain `10_…` would run second on a fresh install, before `1_…`.
-// From 10 on, names are `m<NNN>_<snake_name>` (m010_…, m011_…, up to m899;
-// m9NN is for injected test migrations), which sort after every legacy `<n>_`
-// name as plain strings. Take the next number after develop's highest at merge
-// time, and use each number once. The legacy 0_–9_ names are frozen.
+// order, so on its own it would run a plain `10_…` second on a fresh install,
+// before `1_…`. From 10 on, names are `m<NNN>_<snake_name>` (m010_…, m011_…, up
+// to m899; m9NN is for injected test migrations), which sort after every
+// legacy `<n>_` name as plain strings. Take the next number after develop's
+// highest at merge time, and use each number once (database.test.ts's guard
+// enforces it). The legacy 0_–9_ names are frozen.
 // database.test.ts pins these rules and the match with compareMigrationNames
 // (dal/backup.ts) in CI; at startup, migrateToLatest refuses a registry whose
 // plain-text order differs from name order (T-017).
@@ -472,9 +473,15 @@ export async function migrateToLatest(db: Kysely<Database>): Promise<void> {
   // refuse as "corrupted migrations" (T-017). So the order is checked here by
   // name, and Kysely's check is turned off. Pending migrations still run in
   // Kysely's plain .sort() order; the check also refuses a registry where that
-  // differs from name order, which Kysely's check used to catch.
+  // differs from name order, which Kysely's check caught only once a migration
+  // past the first was applied, and never on a fresh install.
+  //
+  // One read of the provider, shared by the check and the Migrator, so Kysely
+  // runs exactly the migrations the check validated.
+  const migrations = await activeMigrationProvider.getMigrations();
+  const provider: MigrationProvider = { getMigrations: async () => migrations };
   const problem = migrationOrderProblem(
-    await getProviderMigrationNames(activeMigrationProvider),
+    await getProviderMigrationNames(provider),
     await getAppliedMigrationNames(db),
   );
   if (problem !== null) {
@@ -484,7 +491,7 @@ export async function migrateToLatest(db: Kysely<Database>): Promise<void> {
 
   const migrator = new Migrator({
     db,
-    provider: activeMigrationProvider,
+    provider,
     allowUnorderedMigrations: true,
   });
 
