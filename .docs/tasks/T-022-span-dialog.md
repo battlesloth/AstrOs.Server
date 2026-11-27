@@ -17,7 +17,7 @@
   - Single is today's form, unchanged.
   - The dialog opens as it does today: a click on an empty spot of the lane.
   - An existing span opens in Random mode.
-- **Random defaults:**
+- **Random defaults** (confirmed by Jeff, 2026-11-27):
   - start is the clicked time, and end is `defaultSpanEnd(…)` (T-021);
   - the gaps are the kind's floor to 1.0 s;
   - for servos: position 0–100, min move 10, max move blank, and speed and acceleration 0.
