@@ -5,7 +5,7 @@
 ## Context
 
 - **Found by:** the T-012 pre-push review (PLAN.md Backlog § From the T-012 pre-push review, "Kysely orders executed migrations by wall-clock timestamp first").
-- **Decision (Jeff, 2026-11-26):** stop using the clock, as its own task. It must ship in the next server release cut from `develop`. That release brings `9_add_script_event_end_time` (T-007, merged 2026-10-28 and in no release yet; release 1.0.2 has migrations 0–8), and `m010` too if T-013 is in it. (Corrected in the pre-push review: this first said "with T-013", as if `m010` were the first migration to ship since the bug was found.)
+- **Decision (Jeff, 2026-11-26):** stop using the clock, as its own task. It must ship in the next server release cut from `develop`. That release brings `9_add_script_event_end_time` (T-007, merged 2026-10-28 and in no release yet; release 1.0.2 has migrations 0–8), and `m010` too if T-013 is in it. (Corrected in the pre-push review: this first said "with T-013", as if `m010` were the first migration to ship since the bug was found. Jeff confirmed the corrected rule, 2026-11-27.)
 - **The bug:**
   - Kysely 0.27.6 (ours) records each applied migration with `new Date().toISOString()`. 0.29.9, the latest, records `max(now, latest recorded + 1 ms)` instead, but sorts and checks the same way.
   - On every run it sorts the applied migrations by that timestamp (name only breaks exact ties), and requires the result to equal the first N of all the provider's names in plain `.sort()` order (`#ensureMigrationsInOrder`).
