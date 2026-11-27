@@ -205,7 +205,8 @@ function migrationNameViolations(names: string[]): string[] {
 
 describe('migrationNameViolations', () => {
   // Each fixture is a registry change that would break installs; the helper must
-  // flag it now, before any real m-migration exists to exercise the rule.
+  // flag it whatever the production registry holds, so the rules don't depend
+  // on a real m-migration happening to exercise them.
   it.each([
     [['0_initial', '10_x'], /not in a naming scheme/], // plain .sort() runs it before '1_'
     [['0_initial', 'm10_x'], /not in a naming scheme/],

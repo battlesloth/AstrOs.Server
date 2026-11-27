@@ -8,3 +8,4 @@ export { migration_6 } from './migration_6.js';
 export { migration_7 } from './migration_7.js';
 export { migration_8 } from './migration_8.js';
 export { migration_9 } from './migration_9.js';
+export { migration_m010 } from './m010_add_maestro_release_ms.js';

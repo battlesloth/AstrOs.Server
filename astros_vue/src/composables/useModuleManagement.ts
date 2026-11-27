@@ -7,6 +7,7 @@ import type {
   UartModule,
 } from '@/models';
 import { Location, ModuleType, ModuleSubType } from '@/enums';
+import { RELEASE_MS_DEFAULT } from '@/constants/maestro';
 import { useLocationStore } from '@/stores/location';
 import { v4 as uuid } from 'uuid';
 
@@ -163,6 +164,7 @@ export function useModuleManagement() {
         minPos: 500,
         maxPos: 2500,
         homePos: 1250,
+        releaseMs: RELEASE_MS_DEFAULT,
         moduleType: ModuleType.UART,
         moduleSubType: ModuleSubType.MAESTRO,
       };

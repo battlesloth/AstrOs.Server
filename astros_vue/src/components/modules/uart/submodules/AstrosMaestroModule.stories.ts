@@ -16,6 +16,7 @@ function createMaestroChannel(num: number) {
     minPos: 500,
     maxPos: 2500,
     homePos: 1500,
+    releaseMs: 5000,
   };
 }
 

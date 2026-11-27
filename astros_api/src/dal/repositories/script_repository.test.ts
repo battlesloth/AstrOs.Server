@@ -310,6 +310,7 @@ describe('Script Repository', () => {
       2500,
       1500,
       false,
+      5000,
     );
 
     maestroModule.boards[0].channels.push(maestroChannel);
@@ -461,6 +462,7 @@ describe('Script Repository', () => {
       2500,
       1500,
       false,
+      5000,
     );
 
     maestroModule.boards[0].channels.push(maestroChannel);
@@ -1249,6 +1251,7 @@ describe('Script Repository', () => {
         2500,
         1500,
         false,
+        5000,
       );
       const maestroModule: MaestroModule = {
         boards: [
@@ -2146,6 +2149,7 @@ describe('Script Repository', () => {
           2500,
           1500,
           false,
+          5000,
         );
         const scriptId = uuid();
         const scriptChannel: ScriptChannel = {

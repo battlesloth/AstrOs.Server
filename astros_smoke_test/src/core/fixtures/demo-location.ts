@@ -4,6 +4,7 @@ import type { ControllerConfig } from '@api/models/config/controller_config.js';
 import type { ControlModule } from '@api/models/control_module/control_module.js';
 import { GpioChannel } from '@api/models/control_module/gpio/gpio_channel.js';
 import { MaestroChannel } from '@api/models/control_module/uart/sub_modules/maestro/maestro_channel.js';
+import { RELEASE_MS_DEFAULT } from '@api/models/control_module/uart/sub_modules/maestro/release_ms.js';
 import type { MaestroModule } from '@api/models/control_module/uart/sub_modules/maestro/maestro_module.js';
 import { UartModule } from '@api/models/control_module/uart/uart_module.js';
 
@@ -109,6 +110,7 @@ function buildMasterMaestro(servoConfig: ServoConfig[]): UartModule {
               ch.maxPos,
               ch.homePos,
               false,
+              RELEASE_MS_DEFAULT,
             ),
         ),
       },

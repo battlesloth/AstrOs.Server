@@ -9,4 +9,6 @@ export interface MaestroChannel extends UartChannel {
   homePos: number;
   // if not servo, this is default low value
   inverted: boolean;
+  // minimum powered time after a move, in ms (constants/maestro.ts holds the range)
+  releaseMs: number;
 }

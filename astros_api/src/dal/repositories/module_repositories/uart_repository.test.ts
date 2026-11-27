@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Kysely } from 'kysely';
 import { Database } from '../../types.js';
 import { createKyselyConnection, migrateToLatest } from '../../database.js';
@@ -11,8 +11,9 @@ import {
   MaestroChannel,
 } from '../../../models/index.js';
 import type { KangarooX2, MaestroModule, MaestroBoard } from '../../../models/index.js';
-import { getUartModules, upsertUartModules } from './uart_repository.js';
+import { getUartModules, readMaestroChannel, upsertUartModules } from './uart_repository.js';
 import { v4 as uuid } from 'uuid';
+import { logger } from 'src/logger.js';
 
 describe('UartRepository', () => {
   let db: Kysely<Database>;
@@ -25,6 +26,7 @@ describe('UartRepository', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await db.destroy();
   });
 
@@ -248,6 +250,7 @@ describe('UartRepository', () => {
       undefined as any, // Invalid maxPos
       undefined as any, // Invalid homePos
       false,
+      5000,
     );
 
     // Channel 2: NaN values (simulating invalid number input)
@@ -262,6 +265,7 @@ describe('UartRepository', () => {
       NaN, // Invalid maxPos
       NaN, // Invalid homePos
       false,
+      5000,
     );
 
     // Channel 3: null values
@@ -276,6 +280,7 @@ describe('UartRepository', () => {
       null as any, // Invalid maxPos
       null as any, // Invalid homePos
       false,
+      5000,
     );
 
     board.channels.push(channel1, channel2, channel3);
@@ -313,5 +318,178 @@ describe('UartRepository', () => {
     expect(savedChannel3!.minPos).toBe(500);
     expect(savedChannel3!.maxPos).toBe(2500);
     expect(savedChannel3!.homePos).toBe(1250);
+  });
+
+  describe('Maestro channel releaseMs', () => {
+    let locationId: string;
+
+    beforeEach(async () => {
+      locationId = (
+        await db
+          .selectFrom('locations')
+          .select(['id'])
+          .where('name', '=', location)
+          .executeTakeFirstOrThrow()
+      ).id;
+    });
+
+    // One Maestro module with one board; each entry is a channel's releaseMs,
+    // undefined for a channel saved without the field (a stale browser tab),
+    // or null.
+    function maestroWith(modId: string, releaseMs: (number | undefined | null)[]): UartModule {
+      const module = new UartModule(
+        0,
+        modId,
+        'Maestro Module',
+        locationId,
+        ModuleSubType.maestro,
+        1,
+        9600,
+      );
+      const boardId = `${modId}-board`;
+      const board: MaestroBoard = {
+        id: boardId,
+        parentId: modId,
+        boardId: 0,
+        name: 'Board 1',
+        channelCount: releaseMs.length,
+        channels: releaseMs.map(
+          (ms, i) =>
+            new MaestroChannel(
+              `${modId}-ch${i}`,
+              boardId,
+              `Channel ${i}`,
+              true,
+              i,
+              true,
+              500,
+              2500,
+              1500,
+              false,
+              ms as number,
+            ),
+        ),
+      };
+      module.subModule = { boards: [board] } satisfies MaestroModule;
+      return module;
+    }
+
+    async function save(module: UartModule): Promise<void> {
+      await db.transaction().execute(async (trx) => {
+        await upsertUartModules(trx, [module]);
+      });
+    }
+
+    async function loadedReleaseMs(): Promise<number[]> {
+      const [mod] = await getUartModules(db, locationId);
+      return (mod.subModule as MaestroModule).boards[0].channels.map((c) => c.releaseMs);
+    }
+
+    it('loads the releaseMs each channel was saved with', async () => {
+      await save(maestroWith('m1', [15000, 1000, 120000]));
+
+      expect(await loadedReleaseMs()).toEqual([15000, 1000, 120000]);
+    });
+
+    it('stores 5000 for a channel saved without releaseMs', async () => {
+      await save(maestroWith('m1', [undefined, 15000]));
+
+      expect(await loadedReleaseMs()).toEqual([5000, 15000]);
+    });
+
+    // saveLocations refuses a null; the repository still must not hand one to
+    // a NOT NULL column (Kysely drops undefined keys, but sends null).
+    it('stores 5000 for a null releaseMs', async () => {
+      await save(maestroWith('m1', [null, 15000]));
+
+      expect(await loadedReleaseMs()).toEqual([5000, 15000]);
+    });
+
+    it('a later save replaces releaseMs, and one without it resets it to 5000', async () => {
+      await save(maestroWith('m1', [15000, 15000]));
+
+      await save(maestroWith('m1', [20000, undefined]));
+
+      expect(await loadedReleaseMs()).toEqual([20000, 5000]);
+    });
+
+    // A save without the field resets a custom value to the default, which a
+    // client that drops the field by mistake would do silently.
+    it('warns once per board when channels arrive without releaseMs', async () => {
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+      await save(maestroWith('m1', [undefined, 15000, null]));
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        'UartRepository.upsertMaestroModule: board 0 (m1-board): 2 channel(s) saved without releaseMs; storing 5000',
+      );
+    });
+
+    it('warns for each board that had channels without releaseMs', async () => {
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      const module = maestroWith('m1', [undefined, 5000]);
+      const second = maestroWith('m2', [undefined, undefined, 5000]);
+      const secondBoard = (second.subModule as MaestroModule).boards[0];
+      (module.subModule as MaestroModule).boards.push({
+        ...secondBoard,
+        parentId: 'm1',
+        boardId: 1,
+        channels: secondBoard.channels.map((c) => ({ ...c, parentId: secondBoard.id })),
+      });
+
+      await save(module);
+
+      expect(warnSpy.mock.calls).toEqual([
+        [
+          'UartRepository.upsertMaestroModule: board 0 (m1-board): 1 channel(s) saved without releaseMs; storing 5000',
+        ],
+        [
+          'UartRepository.upsertMaestroModule: board 1 (m2-board): 2 channel(s) saved without releaseMs; storing 5000',
+        ],
+      ]);
+    });
+
+    it('does not warn when every channel has releaseMs', async () => {
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+      await save(maestroWith('m1', [5000, 15000]));
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    // saveLocations refuses a bad value first; a caller that skips it must not
+    // store one (INTEGER affinity keeps 1500.5 as REAL and 'abc' as TEXT).
+    it.each([
+      [999, 'RELEASE_MS_OUT_OF_RANGE'],
+      [1500.5, 'RELEASE_MS_NOT_INTEGER'],
+      ['5000', 'RELEASE_MS_NOT_INTEGER'],
+      ['abc', 'RELEASE_MS_NOT_INTEGER'],
+    ])('refuses to store releaseMs %j (%s), writing nothing', async (bad, code) => {
+      await expect(save(maestroWith('m1', [5000, bad as number]))).rejects.toThrow(
+        `UartRepository.upsertMaestroModule: channel m1-ch1: ${code}`,
+      );
+
+      for (const table of ['uart_modules', 'maestro_boards', 'maestro_channels'] as const) {
+        expect(await db.selectFrom(table).select('id').execute()).toEqual([]);
+      }
+    });
+
+    // BACKUP_FAILED, the MIGRATION_FAILED_* modes and MIGRATION_INTERRUPTED
+    // skip, undo or stop short of m010 but still serve reads, so the table may
+    // have no release_ms column.
+    it('reads channels from a table without release_ms as 5000', async () => {
+      await save(maestroWith('m1', [15000, 15000]));
+      await db.schema.alterTable('maestro_channels').dropColumn('release_ms').execute();
+
+      expect(await loadedReleaseMs()).toEqual([5000, 5000]);
+      expect((await readMaestroChannel(db, 'm1-ch1')).releaseMs).toBe(5000);
+    });
+
+    it('readMaestroChannel returns releaseMs', async () => {
+      await save(maestroWith('m1', [5000, 42000]));
+
+      expect((await readMaestroChannel(db, 'm1-ch1')).releaseMs).toBe(42000);
+    });
   });
 });

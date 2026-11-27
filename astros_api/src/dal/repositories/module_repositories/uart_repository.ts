@@ -6,6 +6,8 @@ import {
   KangarooX2Channel,
   MaestroChannel,
   ModuleSubType,
+  RELEASE_MS_DEFAULT,
+  releaseMsProblem,
   UartModule,
   UartChannel,
 } from 'src/models/index.js';
@@ -285,11 +287,26 @@ async function upsertMaestroModule(
         throw err;
       });
 
+    let withoutReleaseMs = 0;
+
     for (const channel of board.channels) {
       // Ensure position values are valid finite numbers, otherwise use defaults
       const minPos = Number.isFinite(channel.minPos) ? channel.minPos : 500;
       const maxPos = Number.isFinite(channel.maxPos) ? channel.maxPos : 2500;
       const homePos = Number.isFinite(channel.homePos) ? channel.homePos : 1250;
+      // An absent or null releaseMs gets the default (a tab from before the
+      // field existed sends none). saveLocations refuses a bad value with a 400
+      // before any write; this throw keeps a caller that skips that check from
+      // storing one (the column's INTEGER affinity keeps 1500.5 as REAL and
+      // 'abc' as TEXT; it converts '5000' to 5000).
+      if (channel.releaseMs === undefined || channel.releaseMs === null) {
+        withoutReleaseMs++;
+      }
+      const releaseMs = channel.releaseMs ?? RELEASE_MS_DEFAULT;
+      const problem = releaseMsProblem(releaseMs);
+      if (problem !== null) {
+        throw new Error(`UartRepository.upsertMaestroModule: channel ${channel.id}: ${problem}`);
+      }
 
       await trx
         .insertInto('maestro_channels')
@@ -304,6 +321,7 @@ async function upsertMaestroModule(
           max_pos: maxPos,
           home_pos: homePos,
           inverted: channel.inverted ? 1 : 0,
+          release_ms: releaseMs,
         })
         .onConflict((c) =>
           c.column('id').doUpdateSet((eb) => ({
@@ -316,6 +334,7 @@ async function upsertMaestroModule(
             max_pos: eb.ref('excluded.max_pos'),
             home_pos: eb.ref('excluded.home_pos'),
             inverted: eb.ref('excluded.inverted'),
+            release_ms: eb.ref('excluded.release_ms'),
           })),
         )
         .executeTakeFirst()
@@ -323,6 +342,16 @@ async function upsertMaestroModule(
           logger.error('UartRepository.upsertMaestroModule', err);
           throw err;
         });
+    }
+
+    // The save writes the default over whatever the channel held; a client
+    // that drops the field by mistake looks the same as a stale tab. Logged
+    // inside the transaction, so a later failure can still roll it back.
+    if (withoutReleaseMs > 0) {
+      logger.warn(
+        `UartRepository.upsertMaestroModule: board ${board.boardId} (${board.id}): ` +
+          `${withoutReleaseMs} channel(s) saved without releaseMs; storing ${RELEASE_MS_DEFAULT}`,
+      );
     }
   }
 }
@@ -367,6 +396,10 @@ async function loadMaestroModule(
         throw err;
       });
 
+    // `?? RELEASE_MS_DEFAULT` on the reads below: BACKUP_FAILED, the
+    // MIGRATION_FAILED_* modes and MIGRATION_INTERRUPTED serve reads from a
+    // database m010 never reached (or that was restored to before it, or left
+    // half-migrated), whose rows may have no release_ms.
     for (const c of channels) {
       board.channels.push(
         new MaestroChannel(
@@ -380,6 +413,7 @@ async function loadMaestroModule(
           c.max_pos,
           c.home_pos,
           c.inverted > 0,
+          c.release_ms ?? RELEASE_MS_DEFAULT,
         ),
       );
     }
@@ -445,6 +479,7 @@ export async function readMaestroChannel(
     channel.max_pos,
     channel.home_pos,
     channel.inverted > 0,
+    channel.release_ms ?? RELEASE_MS_DEFAULT,
   );
 }
 

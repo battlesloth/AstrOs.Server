@@ -320,6 +320,7 @@ export interface MaestroChannelTable {
   max_pos: number;
   home_pos: number;
   inverted: number;
+  release_ms: number;
 }
 
 export type MaestroChannel = Selectable<MaestroChannelTable>;

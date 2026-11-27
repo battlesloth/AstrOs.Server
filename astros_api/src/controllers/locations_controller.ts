@@ -1,4 +1,9 @@
-import { Constants, LocationCollection } from 'src/models/index.js';
+import {
+  Constants,
+  findInvalidReleaseMs,
+  LocationCollection,
+  ReleaseMsProblemEntry,
+} from 'src/models/index.js';
 import { logger } from 'src/logger.js';
 import { LocationsRepository } from 'src/dal/repositories/locations_repository.js';
 import { Router } from 'express';
@@ -6,6 +11,8 @@ import { Kysely } from 'kysely';
 import { Database } from 'src/dal/types.js';
 
 const route = '/locations/';
+// Problems logged per refused save; the 400 reply carries all of them.
+const LOGGED_PROBLEMS = 10;
 const loadRoute = '/locations/load';
 
 export function registerLocationRoutes(router: Router, authHandler: any, db: Kysely<Database>) {
@@ -57,9 +64,25 @@ export async function getLocations(db: Kysely<Database>, req: any, res: any, nex
   }
 }
 
-async function saveLocations(db: Kysely<Database>, req: any, res: any, next: any) {
+export async function saveLocations(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new LocationsRepository(db);
+
+    // Before any write: each location below is saved in its own transaction,
+    // so a refusal after the first would leave a partial save.
+    const problems = findInvalidReleaseMs(req.body);
+    if (problems.length > 0) {
+      // Server-generated text only (codes and positions), and the first few:
+      // the 400 reply carries every problem.
+      const rest = problems.length - LOGGED_PROBLEMS;
+      logger.warn(
+        `saveLocations: refused: ${problems.slice(0, LOGGED_PROBLEMS).map(describeProblem).join('; ')}` +
+          (rest > 0 ? `; … and ${rest} more` : ''),
+      );
+      res.status(400);
+      res.json({ message: 'invalid_release_ms', problems });
+      return;
+    }
 
     const modules = req.body as LocationCollection;
 
@@ -94,6 +117,10 @@ async function saveLocations(db: Kysely<Database>, req: any, res: any, next: any
       message: 'Internal server error',
     });
   }
+}
+
+function describeProblem(p: ReleaseMsProblemEntry): string {
+  return `${p.location} uartModules[${p.moduleIndex}].boards[${p.boardIndex}].channels[${p.channelIndex}] ${p.code}`;
 }
 
 async function loadLocations(db: Kysely<Database>, req: any, res: any, next: any) {
