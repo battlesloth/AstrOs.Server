@@ -10,6 +10,7 @@ AstrOs (Astromech Operating System) is a control system for R2-D2/astromech droi
 
 - **`astros_api/`** — Express/TypeScript backend (API + WebSocket + serial communication)
 - **`astros_vue/`** — Vue 3 + Vite frontend (Tailwind CSS + DaisyUI, Pinia stores, PixiJS timeline)
+- **`astros_smoke_test/`** — bench smoke-test CLI + cockpit UI; imports API models via `@api/...`, so an API model or signature change can break its CI typecheck
 - **`container_files/`** — nginx config for Docker container
 - **`deployment/`** — Deployment scripts
 
@@ -18,7 +19,7 @@ AstrOs (Astromech Operating System) is a control system for R2-D2/astromech droi
 ### API Backend (`astros_api/`)
 
 ```bash
-npm run build          # Lint + compile TypeScript to dist/
+npm run build          # Lint + tsc && tsc-alias to dist/ (plain tsc leaves src/… imports unresolved); needs astros_api/.env (gitignored; copy it into a worktree)
 npm run start          # Run compiled JS from dist/
 npm run start:tsx      # Run TypeScript directly via tsx (dev)
 npm run test           # Run vitest (watch mode)
@@ -50,7 +51,8 @@ docker compose up      # Ports: 8080 (nginx/Vue), 3000 (API), 5000 (WebSocket)
 
 - **Single monolithic server class**: `api_server.ts` bootstraps Express, WebSocket, passport auth (JWT), and serial port communication in one `ApiServer` class.
 - **Serial communication**: A `Worker` thread (`background_tasks/serial_worker.js`) handles async serial messaging. The main thread communicates with it via `postMessage`/`onMessage`. In test mode (`NODE_ENV=test`), serial port setup is skipped.
-- **Database**: SQLite via better-sqlite3 + Kysely query builder. In-memory DB for tests, file-based at `~/.config/astrosserver/database.sqlite3` in production. Migrations are registered programmatically in `dal/database.ts` (`PRODUCTION_MIGRATIONS`). New migrations are named `m<NNN>_<snake_name>` from `m010` on (T-012): Kysely runs them in plain-string order, so a `10_…` would sort before `1_…`. Take the next number after develop's highest at merge time and use each once (`m010`–`m899`; `m9NN` is for injected test migrations); the legacy `0_`–`9_` names are frozen. Plain-string order must match `compareMigrationNames` (`dal/backup.ts`); `dal/database.test.ts` pins all three.
+- **Database**: SQLite via better-sqlite3 + Kysely query builder. In-memory DB for tests, file-based at `~/.config/astrosserver/database.sqlite3` in production. Migrations are registered programmatically in `dal/database.ts` (`PRODUCTION_MIGRATIONS`). New migrations are named `m<NNN>_<snake_name>` from `m010` on (T-012): Kysely runs them in plain-string order, so a `10_…` would sort before `1_…`. Take the next number after develop's highest at merge time and use each once (`m010`–`m899`; `m9NN` is for injected test migrations); the legacy `0_`–`9_` names are frozen. `dal/database.test.ts` pins these rules and that plain `.sort()`, `compareMigrationNames` (`dal/backup.ts`) and `localeCompare` agree. `migrateToLatest` builds Kysely's `Migrator` with `allowUnorderedMigrations: true` (a droid's clock can record migrations out of order; T-017) and runs `migrationOrderProblem` first; any other production `Migrator` must do the same.
+- **Vitest gotchas (API)**: `src/…` and relative specifiers can load separate module instances, so spy on or mock anything (loggers, repositories) via the specifier the code under test imports (`system_status.ts` and `dal/backup.ts` use the relative `logger.js`; `dal/database.ts` and most of `src/` use `src/logger.js`), and assert the spy was reached. The globalSetup runs `tsc` first: a type error fails the whole run ("globalSetup: npx tsc failed") with no test output, so mutations must type-check.
 - **Route registration**: Each controller exports a `register*Routes(router, authHandler)` function called from `api_server.ts`.
 - **Repositories**: Data access in `dal/repositories/` — one per domain (scripts, playlists, locations, controllers, etc.).
 - **Environment**: Configured via `.env` file copied to `dist/` at build time. Key vars: `JWT_KEY`, `API_PORT`, `WEBSOCKET_PORT`, `SERIAL_PORT`, `BAUD_RATE`.
@@ -75,6 +77,7 @@ Before each implementation commit, run in order:
 1. Formatting + lint, in **every** sub-project the diff touches — the script names differ:
    - `astros_api/`: `npm run prettier:write && npm run lint:fix` (CI checks with `npm run prettier:check`; the build also lints via `prebuild`).
    - `astros_vue/`: `npm run format && npm run lint` (CI checks with `npx prettier --check --experimental-cli "src/**"`). There is **no** `prettier:write` script in `astros_vue`, and `npm run build` there does not lint.
+   - `astros_smoke_test/`: `npm run prettier:write && npm run lint:fix && npm run typecheck` (CI also runs `web:build` and `npm run test -- --run`). Run it whenever an API model it imports changes, even if the diff doesn't touch the folder.
    Re-run after the last edit and read the check output. An empty `git diff` after `npm run <script> --silent | tail` is not evidence — it hides a "missing script" error (this is how PR #122's CI prettier check failed).
 2. `npm run build` (type-check) and the test suite (`npx vitest run` for single-run mode).
 3. Invoke `superpowers:requesting-code-review` on the diff against the prior commit (or `origin/<branch>` for a batch of unpushed work). Mechanical checks confirm the code compiles and tests pass; code review catches what tests can't see — comment-vs-code drift, naming-vs-protocol mismatches, missing capabilities, broken test-name format strings, and similar issues that have repeatedly come back as PR feedback when this step is skipped. Address **Critical** and **Important** issues before committing; note **Minor** for later.
