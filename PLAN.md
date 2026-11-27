@@ -240,11 +240,11 @@ From the T-012 pre-push review (2026-11-22; all pre-existing, not T-012 regressi
   - Reproduced by the reviewer: a migration that creates a table and then throws, with the restore failing on boot 1. On boot 2 the backup holds the partial table.
   - Candidate fix: a sentinel file `<db>.migration-in-progress` that records the backup path, written before migrating and removed after success or a good restore. A boot that finds it must not take a new backup: restore from the recorded one, or enter read-only (`MIGRATION_INTERRUPTED`).
   - Needs a failure-mode inventory. **Fix before T-013 ships the first `m010_` migration to droids.**
-- **Kysely orders executed migrations by wall-clock timestamp first.**
+- ~~**Kysely orders executed migrations by wall-clock timestamp first.**~~ → T-017 (Jeff, 2026-11-26: stop using the clock; Kysely's check is off and `migrateToLatest` checks by name).
   - The hazard: an SBC without a battery-backed clock (a Pi) that boots before NTP sync can record migration N+1 with an earlier timestamp than N. The next upgrade then refuses as "corrupted migrations", and Kysely's message blames the order.
   - It applies to any naming scheme.
   - Candidates: order by `rowid` via a custom check, or refuse to migrate while the clock is behind the newest `kysely_migration` timestamp.
-- **The naming rule is enforced only in CI.** `database.test.ts`'s `migrationNameViolations` catches a misnamed migration before merge. A startup check that names the bad migration would be defense in depth.
+- **The naming rule is enforced mostly in CI.** `database.test.ts`'s `migrationNameViolations` catches a misnamed migration before merge. Since T-017, `migrateToLatest` also refuses at startup a registry whose plain-text run order differs from name order (the part that decides what runs when). The pattern, the frozen legacy names and unique numbers are still CI-only; a startup check naming those would be defense in depth.
 - **The newer-database guard's message joins unknown names with `, `.** An empty or space-padded name from a tampered row is then invisible. Use `JSON.stringify` per name.
 - **`getLastAppliedMigrationName` returns `null` when applied rows exist but none is known.** A caller can't tell that from a fresh database, which skips the backup. It's safe today only because `initializeDatabase` checks for unknown migrations first. Throwing would protect a future caller.
 

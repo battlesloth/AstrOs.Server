@@ -9,26 +9,31 @@ import { SystemStatus } from '../system_status.js';
 import { Database } from './types.js';
 import { migrationSentinelPath, writeMigrationSentinel } from './backup.js';
 import { logger as dbLogger } from 'src/logger.js';
+// system_status.ts imports the logger by a relative path; under vitest that is a
+// separate instance from 'src/logger.js', so its read-only line is spied here.
+import { logger as statusLogger } from '../logger.js';
 import {
   initializeDatabase,
   closeDatabaseForTest,
+  createKyselyConnection,
+  migrateToLatest,
   PRODUCTION_MIGRATIONS,
   __setMigrationProviderForTest,
   __resetMigrationProviderForTest,
 } from './database.js';
 
 // Layers injected test migrations on top of a real baseline (the production
-// registry by default) rather than truncating it. Without the baseline, kysely
-// sees migrations in kysely_migration but missing from the provider and throws
-// "corrupted migrations" before any extra migration runs — which would short-
+// registry by default) rather than truncating it. Without the baseline, the
+// database records migrations the provider lacks, and the newer-database guard
+// (T-006) stops the boot before any extra migration runs — which would short-
 // circuit tests that intend to exercise post-migration paths.
 function buildProvider(
   extra: Record<string, Migration> = {},
   base: Readonly<Record<string, Migration>> = PRODUCTION_MIGRATIONS,
 ): MigrationProvider {
-  // Kysely orders migrations by plain string sort. An injected migration that
-  // sorts before the baseline's latest is refused as "corrupted migrations",
-  // which would let a failure-path test pass without running it.
+  // Kysely runs migrations in plain string order. An injected migration that
+  // sorts before the baseline's latest is refused by migrateToLatest's order
+  // check (T-017), which would let a failure-path test pass without running it.
   const latest = Object.keys(base).sort().at(-1) ?? '';
   for (const name of Object.keys(extra)) {
     if (name <= latest) {
@@ -532,8 +537,8 @@ describe('the m<NNN>_ migration naming scheme', { timeout: 15_000 }, () => {
   });
 
   it('refuses an injected test migration that sorts before the baseline latest', () => {
-    // Break: a misordered injected migration that Kysely refuses as "corrupted
-    // migrations", letting a failure-path test pass without running it.
+    // Break: a misordered injected migration that migrateToLatest's order check
+    // refuses, letting a failure-path test pass without running it.
     expect(() => buildProvider({ '0_zz': noopNext.m911_test_next })).toThrow(/must sort after/);
     expect(() => buildProvider({ m910_x: noopNext.m911_test_next }, legacyOnly)).not.toThrow();
   });
@@ -582,9 +587,10 @@ describe('the m<NNN>_ migration naming scheme', { timeout: 15_000 }, () => {
 
   it('upgrades a fresh install whose migrations all share one timestamp', async () => {
     // A fresh install runs every migration within a few milliseconds, so their
-    // kysely_migration timestamps tie, and Kysely then orders the executed rows
-    // by localeCompare on the name. The next upgrade checks that order against
-    // the plain-sorted provider; with unique numbers the two agree.
+    // kysely_migration timestamps tie. Kysely's own order check broke such ties
+    // with localeCompare; since T-017 migrateToLatest turns that check off and
+    // checks by name, so this is a regression check that an upgrade from tied
+    // timestamps still works.
     __setMigrationProviderForTest(buildProvider(sample));
     await initializeDatabase(new SystemStatus(), { dbPath });
     await closeDatabaseForTest();
@@ -1481,4 +1487,201 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
       expect(atRestore).toEqual([0, 0]);
     },
   );
+});
+
+// Kysely orders applied migrations by the clock time it recorded for each and
+// refuses when that disagrees with name order. A droid without a
+// battery-backed clock can record a migration as older than the one before it
+// (T-017); the order is now checked by name.
+describe('migration order with a wrong clock', { timeout: 15_000 }, () => {
+  let tmpDir: string;
+  let dbPath: string;
+  const [secondLast, last] = Object.keys(PRODUCTION_MIGRATIONS).sort().slice(-2);
+
+  beforeEach(() => {
+    ran = [];
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'astros-db-clock-'));
+    dbPath = path.join(tmpDir, 'database.sqlite3');
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await closeDatabaseForTest();
+    __resetMigrationProviderForTest();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  // Each injected migration's `up` records its table name here: a refusal
+  // restores the backup, which erases anything a test could read in the
+  // database afterwards.
+  let ran: string[];
+
+  // A migration that leaves a table behind, so the test can see it ran.
+  function marking(table: string): Migration {
+    return {
+      async up(db) {
+        ran.push(table);
+        await db.schema.createTable(table).addColumn('id', 'integer').execute();
+      },
+      async down() {
+        return;
+      },
+    };
+  }
+
+  async function tableExists(db: Kysely<Database>, table: string): Promise<boolean> {
+    const rows = await sql<{ name: string }>`
+      SELECT name FROM sqlite_master WHERE type = 'table' AND name = ${table}
+    `.execute(db);
+    return rows.rows.length > 0;
+  }
+
+  // Migrates to the production latest, records every migration one second
+  // apart in name order, then applies `changes`, so exactly the pairs a test
+  // stages are out of order.
+  async function migrateThenSetTimestamps(changes: Record<string, string>): Promise<void> {
+    await initializeDatabase(new SystemStatus(), { dbPath });
+    await closeDatabaseForTest();
+    const sqlite = new SQLite(dbPath);
+    const setStamp = sqlite.prepare('UPDATE kysely_migration SET timestamp = ? WHERE name = ?');
+    const stamps = {
+      ...Object.fromEntries(
+        Object.keys(PRODUCTION_MIGRATIONS)
+          .sort()
+          .map((name, i) => [name, new Date(Date.UTC(2026, 0, 1, 0, 0, i)).toISOString()]),
+      ),
+      ...changes,
+    };
+    for (const [name, stamp] of Object.entries(stamps)) {
+      // A name that matched no row would leave nothing out of order.
+      expect(setStamp.run(stamp, name).changes).toBe(1);
+    }
+    sqlite.close();
+  }
+
+  // One second apart from 2026-01-01T00:00:00Z, so the one before `last` is at
+  // (count - 2) seconds; half a second earlier sits between it and the one
+  // before that.
+  const secondLastStamp = new Date(
+    Date.UTC(2026, 0, 1, 0, 0, Object.keys(PRODUCTION_MIGRATIONS).length - 2),
+  );
+
+  it.each([
+    [
+      'ran behind: the last migration recorded just before the one ahead of it',
+      { [last]: new Date(secondLastStamp.getTime() - 500).toISOString() },
+    ],
+    [
+      'was ahead, then corrected: the one before the last recorded in 2099',
+      { [secondLast]: '2099-01-01T00:00:00.000Z' },
+    ],
+  ])('upgrades a database whose clock %s', async (_label, changes) => {
+    await migrateThenSetTimestamps(changes);
+
+    __setMigrationProviderForTest(buildProvider({ m930_test_after_clock: marking('t017_ran') }));
+    const status = new SystemStatus();
+    const db = await initializeDatabase(status, { dbPath });
+
+    expect(status.getState()).toEqual({ readOnly: false });
+    expect(await tableExists(db, 't017_ran')).toBe(true);
+    expect((await runOrder(db)).at(-1)).toBe('m930_test_after_clock');
+    expect(fs.existsSync(path.join(tmpDir, `database.sqlite3.backup-${last}`))).toBe(true);
+    expect(fs.existsSync(migrationSentinelPath(dbPath))).toBe(false);
+  });
+
+  // Kysely runs pending migrations in plain text order, where a misnamed
+  // `10_…` sorts before `1_…`. With Kysely's own check off, nothing else stops
+  // it running ahead of the legacy migrations a droid that skipped a release
+  // still lacks (T-017 amendment).
+  it('refuses a misnamed migration Kysely would run out of turn', async () => {
+    const throughSeven = Object.fromEntries(
+      Object.entries(PRODUCTION_MIGRATIONS).filter(([name]) => /^[0-7]_/.test(name)),
+    );
+    __setMigrationProviderForTest(buildProvider({}, throughSeven));
+    await initializeDatabase(new SystemStatus(), { dbPath });
+    await closeDatabaseForTest();
+    const errorSpy = vi.spyOn(statusLogger, 'error');
+
+    // Built by hand: buildProvider refuses a name that sorts before its base.
+    __setMigrationProviderForTest(
+      new (class implements MigrationProvider {
+        async getMigrations(): Promise<Record<string, Migration>> {
+          return { ...PRODUCTION_MIGRATIONS, '10_x_misnamed': marking('t017_misnamed') };
+        }
+      })(),
+    );
+    const infoSpy = vi.spyOn(dbLogger, 'info');
+    const status = new SystemStatus();
+    const db = await initializeDatabase(status, { dbPath });
+
+    expect(status.getState().reasonCode).toBe('MIGRATION_FAILED_RESTORED');
+    // The refusal came before Kysely ran anything: no `up` and no migration
+    // line (the restore would hide a run from the database itself).
+    expect(ran).toEqual([]);
+    expect(infoSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/^Created pre-migration backup at /),
+    );
+    expect(infoSpy).not.toHaveBeenCalledWith(expect.stringMatching(/was executed successfully$/));
+    expect(await runOrder(db)).toEqual(Object.keys(throughSeven).sort());
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Kysely would run migration 10_x_misnamed before 1_add_script_evt_id: migration names must sort the same as plain text and by number (T-012)',
+      ),
+    );
+  });
+
+  it('still refuses a pending migration that sorts before an applied one', async () => {
+    __setMigrationProviderForTest(buildProvider({ m932_test_b: marking('t017_b') }));
+    await initializeDatabase(new SystemStatus(), { dbPath });
+    await closeDatabaseForTest();
+    const errorSpy = vi.spyOn(statusLogger, 'error');
+    const dbErrorSpy = vi.spyOn(dbLogger, 'error');
+    const dbWarnSpy = vi.spyOn(dbLogger, 'warn');
+
+    __setMigrationProviderForTest(
+      buildProvider({ m931_test_a: marking('t017_a'), m932_test_b: marking('t017_b') }),
+    );
+    const status = new SystemStatus();
+    const db = await initializeDatabase(status, { dbPath });
+
+    expect(status.getState().reasonCode).toBe('MIGRATION_FAILED_RESTORED');
+    // `m932` ran on the first boot only; nothing ran on the refused one.
+    expect(ran).toEqual(['t017_b']);
+    expect(await tableExists(db, 't017_b')).toBe(true);
+    const message =
+      'pending migration m931_test_a sorts before applied migration m932_test_b; applied migrations must come first in name order';
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining(message));
+    expect(dbErrorSpy).toHaveBeenCalledWith(`failed to migrate: ${message}`);
+    // Today's failure path: the backup restored and the sentinel removed.
+    expect(dbWarnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/^Restored database from backup .* after failed migration$/),
+    );
+    expect(fs.existsSync(migrationSentinelPath(dbPath))).toBe(false);
+  });
+
+  // The refusal comes before Kysely starts: its first act is to create
+  // kysely_migration, so a database without that table never reached it. This
+  // is also the direct (and in-memory) call path initializeDatabase's memory
+  // branch uses.
+  it('refuses before Kysely starts, on a direct call', async () => {
+    const conn = createKyselyConnection();
+    try {
+      __setMigrationProviderForTest(
+        new (class implements MigrationProvider {
+          async getMigrations(): Promise<Record<string, Migration>> {
+            return { ...PRODUCTION_MIGRATIONS, '10_x_misnamed': marking('t017_misnamed') };
+          }
+        })(),
+      );
+
+      await expect(migrateToLatest(conn.db)).rejects.toThrow(
+        'Kysely would run migration 10_x_misnamed before 1_add_script_evt_id: migration names must sort the same as plain text and by number (T-012)',
+      );
+
+      expect(ran).toEqual([]);
+      expect(await tableExists(conn.db, 'kysely_migration')).toBe(false);
+    } finally {
+      await conn.db.destroy();
+    }
+  });
 });

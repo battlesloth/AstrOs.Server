@@ -264,6 +264,31 @@ A migration run writes `<db>.migration-in-progress` (JSON: `backupPath`, `lastAp
    - the backup still has no `partial` table: `sqlite3 database.sqlite3.backup-<last> ".tables"`
 6. Revert the stub.
 
+## Migration order with a wrong clock (T-017)
+
+Kysely records each applied migration with the clock time and, by default, refuses an upgrade when those times disagree with name order. A droid without a battery-backed clock can record one as older than the migration before it. Since T-017 the order is checked by name only.
+
+### 19. Out-of-order recorded times don't block an upgrade
+
+1. Temporarily add a no-op test-range migration to `PRODUCTION_MIGRATIONS` (e.g. `m950_test_noop` whose `up` does nothing), so this build always has one pending, and build.
+2. Stage a copy of the dev database whose recorded times are out of order (a clock that was ahead and then corrected):
+   ```bash
+   mkdir -p /tmp/astros-clock && cp .data/database.sqlite3 /tmp/astros-clock/
+   DB=/tmp/astros-clock/database.sqlite3
+   sqlite3 $DB "UPDATE kysely_migration SET timestamp = '2099-01-01T00:00:00.000Z' WHERE name = '1_add_script_evt_id'"
+   ```
+3. Start the API with `DATABASE_PATH=/tmp/astros-clock`. **Pass:** `Created pre-migration backup …`, then `migration "…" was executed successfully` for each pending migration (`m950_test_noop` last); no banner; `sqlite3 $DB "SELECT timestamp FROM kysely_migration WHERE name = '1_add_script_evt_id'"` still prints the 2099 value (nothing rewrites it). **Fail:** `corrupted migrations`, `MIGRATION_FAILED_RESTORED`, or `sorts before applied migration`.
+4. Restart. **Pass:** no backup line and no migration line.
+5. (Optional, the bug itself.) Stage a **fresh** copy as in step 2 (the one above is migrated now) and start a build from before T-017 with the same stub. **Pass:** `MIGRATION_FAILED_RESTORED`, with `corrupted migrations: expected previously executed migration 2_add_script_duration to be at index 1 but 1_add_script_evt_id was found …` in the log.
+6. Revert the stub.
+
+### 20. A misnamed migration is refused before anything runs
+
+1. Work on a fresh copy as in case 19, step 2 (the timestamps can stay as they are), and record its contents: `sqlite3 $DB .dump | sha256sum > /tmp/astros-clock-dump.sha256`.
+2. Temporarily add a misnamed migration to `PRODUCTION_MIGRATIONS`, e.g. `'10_x_misnamed'` whose `up` creates a table `t017_misnamed`, and build. (`database.test.ts`'s naming guard fails on it, which is the CI gate this case gets past by hand.)
+3. Start the API with `DATABASE_PATH=/tmp/astros-clock`. **Pass:** the `MIGRATION_FAILED_RESTORED` banner; the log has `failed to migrate: Kysely would run migration 10_x_misnamed before 1_add_script_evt_id: migration names must sort the same as plain text and by number (T-012)` and no `was executed successfully` line; `sqlite3 $DB ".tables"` has no `t017_misnamed`; after stopping the API, `sqlite3 $DB .dump | sha256sum` matches the line in `/tmp/astros-clock-dump.sha256` (the raw file differs after a restore; its contents don't).
+4. Revert the stub.
+
 ## Storybook spot-check
 
 Run `cd astros_vue && npm run storybook`. Navigate to "Components / Common / AstrosSystemStatusBanner". Verify each story renders without console errors:
