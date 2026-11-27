@@ -4,9 +4,9 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  Per-channel servo release time (T-014–T-015 left, cross-repo with AstrOs.ESP T-010) and Random span events (Phase A done; T-010 and Phase B next)
+Active:  Random span events (Phase B, the scripter UI: T-010, T-021–T-025) and Per-channel servo release time (T-014–T-015), both ahead of the AstrOs.ESP v1.3.0 release
 Now:     No task in progress. T-013 (PR #141) and T-017 (PR #142) merged 2026-11-27; `develop` green after both (API 1423/1423, Vue 789, smoke typecheck). The next server release carries migrations 9 and `m010` with T-017's name-order check. AstrOs.ESP's T-010 (PR #66), T-011 (PR #67) and T-012 (PR #68) are merged; its v1.3.0 is held for this repo's T-014 and the release regression (which includes T-010's joint bench)
-Next:    per-channel release: T-014 (8 fields + sync gate) → joint bench in the ESP release regression → ESP v1.3.0 release; T-015 (UI field, Vue-only: the release-time field and a message per refusal code) any time now. After the server release: T-018 (named constructor fields) → T-019 (delete the dead timeline module); T-020 (prune backups by the migration they hold) any time after it. Random spans, agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 ✓ → T-007 ✓ → T-008 ✓ → server T-009 ✓ → ESP T-009 bench ✓ → ESP v1.3.0 release (now also carrying per-channel release) → server T-010 (report skipped spans on upload; before Phase B) → Phase B scripter (decomposed at phase start) → Phase C. Inserting spans by SQL for a bench: also set `scripts.duration_ds` to `MAX(COALESCE(end_time, time))` (or open and save the script once, since `duration_ds` is only recomputed on save), and keep each span row within `0 ≤ time < end_time ≤ 6000` ds, because since T-009 a stored span outside that makes every save of its script answer 400. Check: `SELECT id FROM script_events WHERE end_time IS NOT NULL AND (end_time <= time OR time < 0 OR end_time > 6000)` returns nothing
+Next:    the server work for both features before any firmware release (Jeff, 2026-11-27: the UI may turn up changes the firmware needs). Random spans: T-010 → T-021 → T-022 → T-023 → T-024 → T-025. Per-channel release: T-014 (8 fields + sync gate) and T-015 (UI field), in any order relative to the span tasks. Then the ESP release regression (the per-channel joint bench and the random-span end-to-end bench) → ESP v1.3.0 → the server release (it carries migrations 9 and `m010` with T-017's check). After the server release: T-018 → T-019; T-020. Inserting spans by SQL for a bench: also set `scripts.duration_ds` to `MAX(COALESCE(end_time, time))` (or open and save the script once, since `duration_ds` is only recomputed on save), and keep each span row within `0 ≤ time < end_time ≤ 6000` ds, because since T-009 a stored span outside that makes every save of its script answer 400. Check: `SELECT id FROM script_events WHERE end_time IS NOT NULL AND (end_time <= time OR time < 0 OR end_time > 6000)` returns nothing
 Blocked: none. A server release carrying T-014 must wait for AstrOs.ESP v1.3.0 to be published: its gate refuses config sync to anything older
 Last:    2026-11-27 — T-013 merged (PR #141; refused release times reported as codes and positions, Jeff) and T-017 merged (PR #142); CLAUDE.md updated; T-019 and T-020 authored; 2026-11-26 — T-012 and T-016 closed out; T-018 authored; 2026-11-25 — T-016 merged (PR #140); develop at `1.0.3-dev.0`
 
@@ -20,18 +20,19 @@ Phase A — database guard + span data and conversion
 - [x] T-007 — Persist random span events (`.docs/tasks/completed/T-007-persist-random-span-events.md`, branch `feature/T-007-persist-random-span-events`; merged 2026-10-28, PR #135; manual check and bench of QA cases 6–7 through the API, 2026-10-27) — ships with T-008
 - [x] T-008 — Convert random spans to ESP commands 6 and 7 (`.docs/tasks/completed/T-008-convert-random-spans.md`, branch `feature/T-008-convert-random-spans`; merged 2026-10-29, PR #136; QA-walked with Jeff 2026-10-29, cases 8–10; amended 2026-10-27: Maestro spans follow the channel's servo/digital setting, a Maestro point without a numeric `position` is skipped; amended 2026-10-29: GPIO lookup by `moduleChannelId`)
 - [x] T-009 — Validate random spans on save (`.docs/tasks/completed/T-009-validate-spans-on-save.md`, branch `feature/T-009-validate-spans-on-save`; merged 2026-10-30, PR #137; QA-walked with Jeff 2026-10-29, cases 3, 6, 11–14; server numbering, not ESP T-009) — 400 with the reason, finite `endTime` after `time`, `isServo` overwritten on save, a span's sub-type must match its channel's (PR #135 review, 2026-10-28), a span within 0–600 s, times judged as stored (whole deciseconds) and `isServo` taken from the stored channel (amended 2026-10-29, Jeff); any time before Phase B
-- [ ] T-010 — Report skipped spans on upload (task file to write; Jeff, 2026-10-29). When the converter skips a span, `uploadScript` answers success and the UI turns green, with only a `warn` line in the API log (T-008 pre-push review). Return the skip reasons additively and show a Vue warning; pins a response-shape contract. Before Phase B
+- [ ] T-010 — Report skipped spans on upload (`.docs/tasks/T-010-report-skipped-spans.md`, branch `feature/T-010-report-skipped-spans`; Jeff, 2026-10-29) — the upload reply lists skipped spans as `SpanSkipReason` codes, and Vue warns
 
-Phase B — scripter (decompose at phase start; contracts already pinned by T-007):
-- shared overlap/clamp, validation and hint-line helpers (TDD)
-- the Single / Random switch in the servo and GPIO dialogs. Gaps are entered in seconds and stored as integer ms (`Math.round(s × 1000)`); a blank max move is stored as `null`, never `0`
-- the span bar on the Pixi timeline (mockup option A), with click-to-edit
-- body drag and edge resize, both stopping at the boundary
-- GPIO ↔ Maestro-digital channel swap for spans (replaces T-007's throw)
+Phase B — scripter (decomposed 2026-11-27; contracts pinned by T-007 and each task file):
+
+- [ ] T-021 — Shared span rules: overlap, clamp, validation, hint (`.docs/tasks/T-021-span-rules.md`, branch `feature/T-021-span-rules`) — pure `utils/spanRules.ts`, TDD; every other Phase B task calls it
+- [ ] T-022 — Random mode in the servo and GPIO event dialogs (`.docs/tasks/T-022-span-dialog.md`, branch `feature/T-022-span-dialog`) — needs T-021
+- [ ] T-023 — Draw a random span as a bar on the timeline (`.docs/tasks/T-023-span-bar.md`, branch `feature/T-023-span-bar`) — needs T-022; Pixi, verified by hand
+- [ ] T-024 — Drag and resize spans, stopping at the boundary (`.docs/tasks/T-024-span-drag-resize.md`, branch `feature/T-024-span-drag-resize`) — needs T-021, T-023
+- [ ] T-025 — Convert random spans when swapping GPIO and Maestro digital channels (`.docs/tasks/T-025-span-channel-swap.md`, branch `feature/T-025-span-channel-swap`) — needs T-022
 
 Phase C — release:
 - ~~raise `MINIMUM_FIRMWARE_VERSION` to the AstrOs.ESP release carrying its T-009 (planned v1.3.0)~~ → T-014 (per-channel release time, 2026-11-22), together with its config-sync gate
-- end-to-end bench QA (`.docs/qa/random-span-events.md`)
+- end-to-end bench QA (`.docs/qa/random-span-events.md`), run in the ESP v1.3.0 release regression together with per-channel release's joint bench. No firmware release before Phase B is done (Jeff, 2026-11-27: the UI may turn up changes the firmware needs)
 
 ## Per-channel servo release time
 
